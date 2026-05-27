@@ -1,0 +1,59 @@
+================================================================
+RESULTADOS DEL PIPELINE NLP
+Fecha: 2026-05-26 22:23:57
+================================================================
+
+[TEXTO LIMPIO]
+El gato de María está en casa Qué lindo Los perros corren y saltan en el parque De dónde son los niños Ellos son de Lima Perú La computadora de Juan es muy rápida pero la mía no Hola Cómo estás tú hoy Yo estoy bien gracias
+
+----------------------------------------------------------------
+
+[TOKENS] — 20 total, 20 únicos
+gato
+María
+casa
+lindo
+perros
+corren
+saltan
+parque
+dónde
+niños
+Lima
+Perú
+computadora
+Juan
+rápida
+Hola
+Cómo
+hoy
+bien
+gracias
+
+----------------------------------------------------------------
+
+[TABLA DE FRECUENCIAS] — f(t) = count(t) / sum(count(ti))
+#     TOKEN                      CONTEO    FRECUENCIA
+-------------------------------------------------------
+1     gato                            1      0.050000
+2     María                           1      0.050000
+3     casa                            1      0.050000
+4     lindo                           1      0.050000
+5     perros                          1      0.050000
+6     corren                          1      0.050000
+7     saltan                          1      0.050000
+8     parque                          1      0.050000
+9     dónde                           1      0.050000
+10    niños                           1      0.050000
+11    Lima                            1      0.050000
+12    Perú                            1      0.050000
+13    computadora                     1      0.050000
+14    Juan                            1      0.050000
+15    rápida                          1      0.050000
+16    Hola                            1      0.050000
+17    Cómo                            1      0.050000
+18    hoy                             1      0.050000
+19    bien                            1      0.050000
+20    gracias                         1      0.050000
+
+================================================================
