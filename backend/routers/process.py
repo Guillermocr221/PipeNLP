@@ -33,6 +33,9 @@ class TextProcessRequest(BaseModel):
     token_mode: str = "words"
     remove_stopwords: bool = True
     extra_stopwords: list[str] = []
+    to_lowercase: bool = False
+    remove_numbers: bool = False
+    normalize_spaces: bool = True
 
 
 def _run(req: TextProcessRequest) -> dict:
@@ -47,6 +50,9 @@ def _run(req: TextProcessRequest) -> dict:
         token_mode=req.token_mode,
         remove_stopwords=req.remove_stopwords,
         stopwords=stopwords,
+        to_lowercase=req.to_lowercase,
+        remove_numbers=req.remove_numbers,
+        normalize_spaces=req.normalize_spaces,
     )
 
 

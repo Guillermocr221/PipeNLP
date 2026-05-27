@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+.env
+.env.*
+
+# VSCode
+.vscode/
+
+# macOS
+.DS_Store
+
+# Node / frontend
+node_modules/
+frontend/node_modules/
+dist/
+frontend/dist/
+
+# Build / packaging
+build/
+*.egg-info/
+.eggs/
+*.egg
+*.whl
+
+# Logs
+*.log
+
+# Jupyter
+.ipynb_checkpoints
+
+# Tests
+.pytest_cache/
+
+# Backend generated storage (exports, temporary datasets)
+backend/storage/
