@@ -15,6 +15,12 @@ function Chip({ label, active, onClick }) {
   )
 }
 
+const TOKEN_HELP = {
+  words: 'Divide el texto en palabras individuales. Es ideal para análisis de frecuencia de palabras.',
+  all: 'Genera tokens para palabras y símbolos aislados. Es útil cuando los símbolos pueden aportar información al análisis.',
+  chars: 'Genera un token por cada carácter. Es útil para análisis a nivel de carácter.',
+}
+
 export default function NLPOptions({
   defaultSymbols,
   defaultStopwords,
@@ -32,12 +38,17 @@ export default function NLPOptions({
     tokenMode,
     removeStopwords,
     extraStopwords,
+    toLowercase,
+    removeNumbers,
+    normalizeSpaces,
   } = options
 
+  const activeSymbols = selectedSymbols ?? []
+
   function toggleSymbol(sym) {
-    const next = selectedSymbols.includes(sym)
-      ? selectedSymbols.filter(s => s !== sym)
-      : [...selectedSymbols, sym]
+    const next = activeSymbols.includes(sym)
+      ? activeSymbols.filter(s => s !== sym)
+      : [...activeSymbols, sym]
     onChange({ ...options, selectedSymbols: next })
   }
 
@@ -68,8 +79,41 @@ export default function NLPOptions({
     <section className="bg-slate-800 rounded-xl p-5 space-y-5">
       <h2 className="text-lg font-semibold text-slate-100">2. Opciones NLP</h2>
 
+      <div className="bg-slate-900/40 border border-slate-700 rounded-xl p-4 space-y-3">
+        <p className="text-slate-200 font-medium">Normalización básica</p>
+        <div className="ml-6 space-y-2">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={toLowercase}
+              onChange={e => onChange({ ...options, toLowercase: e.target.checked })}
+              className="accent-violet-500 w-4 h-4"
+            />
+            <span className="text-sm text-slate-300">Convertir a minúsculas</span>
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={removeNumbers}
+              onChange={e => onChange({ ...options, removeNumbers: e.target.checked })}
+              className="accent-violet-500 w-4 h-4"
+            />
+            <span className="text-sm text-slate-300">Eliminar números</span>
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={normalizeSpaces}
+              onChange={e => onChange({ ...options, normalizeSpaces: e.target.checked })}
+              className="accent-violet-500 w-4 h-4"
+            />
+            <span className="text-sm text-slate-300">Normalizar espacios en blanco</span>
+          </label>
+        </div>
+      </div>
+
       {/* Limpieza de símbolos */}
-      <div className="space-y-3">
+      <div className="bg-slate-900/40 border border-slate-700 rounded-xl p-4 space-y-3">
         <label className="flex items-center gap-2 cursor-pointer">
           <input
             type="checkbox"
@@ -82,15 +126,14 @@ export default function NLPOptions({
 
         {cleanSymbols && (
           <div className="ml-6 space-y-3">
-            <p className="text-xs text-slate-400">
-              Símbolos predefinidos (haz clic para activar/desactivar):
-            </p>
+            <p className="text-xs text-slate-400">Símbolos predefinidos seleccionables</p>
+            <p className="text-xs text-slate-500">Haz clic sobre un símbolo para incluirlo o excluirlo de la limpieza.</p>
             <div className="flex flex-wrap gap-1.5">
               {defaultSymbols.map(sym => (
                 <Chip
                   key={sym}
                   label={sym}
-                  active={selectedSymbols.includes(sym)}
+                  active={activeSymbols.includes(sym)}
                   onClick={() => toggleSymbol(sym)}
                 />
               ))}
@@ -132,7 +175,7 @@ export default function NLPOptions({
       </div>
 
       {/* Tokenización */}
-      <div className="space-y-3">
+      <div className="bg-slate-900/40 border border-slate-700 rounded-xl p-4 space-y-3">
         <label className="flex items-center gap-2 cursor-pointer">
           <input
             type="checkbox"
@@ -144,30 +187,36 @@ export default function NLPOptions({
         </label>
 
         {doTokenize && (
-          <div className="ml-6 flex gap-4">
-            {[
-              { value: 'words', label: 'Palabras (word_tokenize)' },
-              { value: 'all', label: 'Palabras + símbolos' },
-              { value: 'chars', label: 'Caracteres' },
-            ].map(opt => (
-              <label key={opt.value} className="flex items-center gap-1.5 cursor-pointer">
-                <input
-                  type="radio"
-                  name="tokenMode"
-                  value={opt.value}
-                  checked={tokenMode === opt.value}
-                  onChange={() => onChange({ ...options, tokenMode: opt.value })}
-                  className="accent-violet-500"
-                />
-                <span className="text-sm text-slate-300">{opt.label}</span>
-              </label>
-            ))}
+          <div className="ml-6 space-y-3">
+            <div className="flex flex-wrap gap-4">
+              {[
+                { value: 'words', label: 'Palabras (word_tokenize)' },
+                { value: 'all', label: 'Palabras + símbolos (regexp_tokenize)' },
+                { value: 'chars', label: 'Caracteres (list)' },
+              ].map(opt => (
+                <label key={opt.value} className="flex items-center gap-1.5 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="tokenMode"
+                    value={opt.value}
+                    checked={tokenMode === opt.value}
+                    onChange={() => onChange({ ...options, tokenMode: opt.value })}
+                    className="accent-violet-500"
+                  />
+                  <span className="text-sm text-slate-300">{opt.label}</span>
+                </label>
+              ))}
+            </div>
+            <p className="text-xs text-slate-400">{TOKEN_HELP[tokenMode]}</p>
+            <p className="text-xs text-slate-500">
+              La tokenización se aplica sobre el texto resultante después de las opciones de limpieza seleccionadas. Si se activa “Limpiar símbolos”, los símbolos eliminados ya no aparecerán como tokens.
+            </p>
           </div>
         )}
       </div>
 
       {/* Stopwords */}
-      <div className="space-y-3">
+      <div className="bg-slate-900/40 border border-slate-700 rounded-xl p-4 space-y-3">
         <label className="flex items-center gap-2 cursor-pointer">
           <input
             type="checkbox"
@@ -185,7 +234,7 @@ export default function NLPOptions({
 
         {removeStopwords && (
           <div className="ml-6 space-y-2">
-            <p className="text-xs text-slate-400">Agregar stopwords personalizadas (separadas por coma o Enter):</p>
+            <p className="text-xs text-slate-400">Agregar stopwords personalizadas separadas por coma o Enter.</p>
             <div className="flex gap-2">
               <input
                 value={swInput}

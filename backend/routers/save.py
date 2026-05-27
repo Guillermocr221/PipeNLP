@@ -10,11 +10,17 @@ STORAGE.mkdir(exist_ok=True)
 
 
 class SaveRequest(BaseModel):
+    texto_original: Optional[str] = None
     texto_limpio: str
+    texto_procesado: Optional[str] = None
+    tokens_generados: Optional[list[str]] = None
+    tokens_sin_stopwords: Optional[list[str]] = None
     tokens: list[str]
     total_tokens: int
     tokens_unicos: int
     frecuencias: list[dict]
+    metrics: Optional[dict] = None
+    configuracion: Optional[dict] = None
     filename: Optional[str] = None
 
 
@@ -27,8 +33,18 @@ def _build_txt(req: SaveRequest) -> str:
         f"Fecha: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
         sep,
         "",
+        "[TEXTO ORIGINAL]",
+        req.texto_original or "(no incluido)",
+        "",
+        dash,
+        "",
         "[TEXTO LIMPIO]",
         req.texto_limpio,
+        "",
+        dash,
+        "",
+        "[TEXTO PROCESADO FINAL]",
+        req.texto_procesado or " ".join(req.tokens),
         "",
         dash,
         "",
