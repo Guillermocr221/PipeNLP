@@ -1,271 +1,365 @@
 import { useState } from 'react'
 
-function Chip({ label, active, onClick }) {
+// ── Icons ──────────────────────────────────────────────────────
+const ChevIcon = ({ s = 16 }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="6 9 12 15 18 9" />
+  </svg>
+)
+const FilterIcon = ({ s = 14 }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+    <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+  </svg>
+)
+const SigmaIcon = ({ s = 14 }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M18 5H6l7 7-7 7h12" />
+  </svg>
+)
+const XIcon = ({ s = 11 }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+  </svg>
+)
+const PlusIcon = ({ s = 12 }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+  </svg>
+)
+const PlayIcon = ({ s = 14 }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+    <polygon points="5 3 19 12 5 21 5 3" fill="currentColor" />
+  </svg>
+)
+const ResetIcon = ({ s = 14 }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+  </svg>
+)
+const CheckIcon = ({ s = 10 }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="20 6 9 17 4 12" />
+  </svg>
+)
+
+// ── Pipeline section wrapper ────────────────────────────────────
+function PipeSection({ num, title, hint, open, onToggle, enabled, onToggleEnabled, children }) {
   return (
-    <button
-      onClick={onClick}
-      className={`px-2 py-0.5 rounded text-xs font-mono transition ${
-        active
-          ? 'bg-violet-700 text-white'
-          : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
-      }`}
-    >
-      {label === '\t' ? '\\t' : label === '\n' ? '\\n' : label === '\r' ? '\\r' : label}
-    </button>
+    <div className={'section' + (open ? ' open' : '')}>
+      <div className="section-head" onClick={onToggle}>
+        <div className="section-num">{num}</div>
+        <div
+          className={'check' + (enabled ? ' on' : '')}
+          onClick={(e) => { e.stopPropagation(); onToggleEnabled?.() }}
+        />
+        <div className="section-title">{title}</div>
+        {hint && <div className="mute mono" style={{ fontSize: 11 }}>{hint}</div>}
+        <div className="section-chev"><ChevIcon s={16} /></div>
+      </div>
+      {open && <div className="section-body">{children}</div>}
+    </div>
   )
 }
 
-const TOKEN_HELP = {
-  words: 'Divide el texto en palabras individuales. Es ideal para análisis de frecuencia de palabras.',
-  all: 'Genera tokens para palabras y símbolos aislados. Es útil cuando los símbolos pueden aportar información al análisis.',
-  chars: 'Genera un token por cada carácter. Es útil para análisis a nivel de carácter.',
-}
-
 export default function NLPOptions({
-  defaultSymbols,
-  defaultStopwords,
-  options,
-  onChange,
+  opts, setOpts,
+  defaultSymbols, defaultStopwords,
+  onProcess, onReset, loading,
 }) {
-  const [symInput, setSymInput] = useState('')
-  const [swInput, setSwInput] = useState('')
+  const [openSections, setOpenSections] = useState({ 1: false, 2: false, 3: false, 4: true, 5: true, 6: true })
+  const [newSymbol, setNewSymbol] = useState('')
+  const [newStop, setNewStop]     = useState('')
 
-  const {
-    cleanSymbols,
-    selectedSymbols,
-    extraSymbols,
-    doTokenize,
-    tokenMode,
-    removeStopwords,
-    extraStopwords,
-    toLowercase,
-    removeNumbers,
-    normalizeSpaces,
-  } = options
+  const toggle = (key) => setOpts(o => ({ ...o, [key]: !o[key] }))
+  const toggleSection = (n) => setOpenSections(s => ({ ...s, [n]: !s[n] }))
 
-  const activeSymbols = selectedSymbols ?? []
+  const allSymbols = [...new Set([...defaultSymbols, ...opts.extraSymbols])]
 
   function toggleSymbol(sym) {
-    const next = activeSymbols.includes(sym)
-      ? activeSymbols.filter(s => s !== sym)
-      : [...activeSymbols, sym]
-    onChange({ ...options, selectedSymbols: next })
+    setOpts(o => {
+      const s = new Set(o.activeSymbols)
+      if (s.has(sym)) s.delete(sym); else s.add(sym)
+      return { ...o, activeSymbols: [...s] }
+    })
   }
 
-  function addExtraSymbol() {
-    const s = symInput.trim()
-    if (s && !extraSymbols.includes(s)) {
-      onChange({ ...options, extraSymbols: [...extraSymbols, s] })
-    }
-    setSymInput('')
+  function addSymbol() {
+    if (!newSymbol.trim()) return
+    const chars = newSymbol.split('').filter(c => c.trim())
+    setOpts(o => ({
+      ...o,
+      extraSymbols: [...new Set([...o.extraSymbols, ...chars])],
+      activeSymbols: [...new Set([...o.activeSymbols, ...chars])],
+    }))
+    setNewSymbol('')
   }
 
-  function removeExtraSymbol(s) {
-    onChange({ ...options, extraSymbols: extraSymbols.filter(x => x !== s) })
+  function removeExtraSymbol(sym) {
+    setOpts(o => ({
+      ...o,
+      extraSymbols: o.extraSymbols.filter(s => s !== sym),
+      activeSymbols: o.activeSymbols.filter(s => s !== sym),
+    }))
   }
 
-  function addExtraStopword() {
-    const words = swInput.split(/[\s,]+/).map(w => w.trim().toLowerCase()).filter(Boolean)
-    const next = [...new Set([...extraStopwords, ...words])]
-    onChange({ ...options, extraStopwords: next })
-    setSwInput('')
+  function addStop() {
+    if (!newStop.trim()) return
+    const words = newStop.toLowerCase().split(/[\s,]+/).filter(Boolean)
+    setOpts(o => ({ ...o, customStopwords: [...new Set([...o.customStopwords, ...words])] }))
+    setNewStop('')
   }
 
-  function removeExtraStopword(w) {
-    onChange({ ...options, extraStopwords: extraStopwords.filter(x => x !== w) })
+  function removeStop(w) {
+    setOpts(o => ({ ...o, customStopwords: o.customStopwords.filter(s => s !== w) }))
   }
+
+  const activeCount = [opts.lowercase, opts.stripNumbers, opts.normalizeSpaces,
+    opts.removeSymbols, opts.tokenize, opts.removeStopwords].filter(Boolean).length
+
+  const totalStops = defaultStopwords.length + opts.customStopwords.length
+
+  // Build pseudocode preview
+  const pseudocode = [
+    'text = input',
+    opts.lowercase     && 'text = text.lower()',
+    opts.stripNumbers  && 'text = re.sub(r"\\d+", " ", text)',
+    opts.removeSymbols && `text = strip_symbols(text, n=${opts.activeSymbols.length})`,
+    opts.normalizeSpaces && 'text = re.sub(r"\\s+", " ", text).strip()',
+    opts.tokenize      && `tokens = tokenize(text, mode="${opts.tokenizeMode}")`,
+    opts.removeStopwords && `tokens = [t for t in tokens\n          if t not in stop_${totalStops}]`,
+    'return tokens',
+  ].filter(Boolean).join('\n')
 
   return (
-    <section className="bg-slate-800 rounded-xl p-5 space-y-5">
-      <h2 className="text-lg font-semibold text-slate-100">2. Opciones NLP</h2>
+    <div className="grid-2" style={{ gridTemplateColumns: '1.4fr 1fr', alignItems: 'start' }}>
 
-      <div className="bg-slate-900/40 border border-slate-700 rounded-xl p-4 space-y-3">
-        <p className="text-slate-200 font-medium">Normalización básica</p>
-        <div className="ml-6 space-y-2">
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={toLowercase}
-              onChange={e => onChange({ ...options, toLowercase: e.target.checked })}
-              className="accent-violet-500 w-4 h-4"
-            />
-            <span className="text-sm text-slate-300">Convertir a minúsculas</span>
-          </label>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={removeNumbers}
-              onChange={e => onChange({ ...options, removeNumbers: e.target.checked })}
-              className="accent-violet-500 w-4 h-4"
-            />
-            <span className="text-sm text-slate-300">Eliminar números</span>
-          </label>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={normalizeSpaces}
-              onChange={e => onChange({ ...options, normalizeSpaces: e.target.checked })}
-              className="accent-violet-500 w-4 h-4"
-            />
-            <span className="text-sm text-slate-300">Normalizar espacios en blanco</span>
-          </label>
-        </div>
-      </div>
-
-      {/* Limpieza de símbolos */}
-      <div className="bg-slate-900/40 border border-slate-700 rounded-xl p-4 space-y-3">
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={cleanSymbols}
-            onChange={e => onChange({ ...options, cleanSymbols: e.target.checked })}
-            className="accent-violet-500 w-4 h-4"
-          />
-          <span className="text-slate-200 font-medium">Limpiar símbolos</span>
-        </label>
-
-        {cleanSymbols && (
-          <div className="ml-6 space-y-3">
-            <p className="text-xs text-slate-400">Símbolos predefinidos seleccionables</p>
-            <p className="text-xs text-slate-500">Haz clic sobre un símbolo para incluirlo o excluirlo de la limpieza.</p>
-            <div className="flex flex-wrap gap-1.5">
-              {defaultSymbols.map(sym => (
-                <Chip
-                  key={sym}
-                  label={sym}
-                  active={activeSymbols.includes(sym)}
-                  onClick={() => toggleSymbol(sym)}
-                />
-              ))}
-            </div>
-
-            <div className="space-y-1.5">
-              <p className="text-xs text-slate-400">Agregar símbolo inusual:</p>
-              <div className="flex gap-2">
-                <input
-                  value={symInput}
-                  onChange={e => setSymInput(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && addExtraSymbol()}
-                  placeholder="ej: § ° µ"
-                  className="flex-1 bg-slate-900 text-slate-100 border border-slate-700 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-violet-500"
-                />
-                <button
-                  onClick={addExtraSymbol}
-                  className="px-3 py-1.5 bg-violet-700 hover:bg-violet-600 text-white rounded-lg text-sm"
-                >
-                  +
-                </button>
-              </div>
-              {extraSymbols.length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                  {extraSymbols.map(s => (
-                    <span
-                      key={s}
-                      className="flex items-center gap-1 px-2 py-0.5 bg-violet-900/50 border border-violet-600 text-violet-200 rounded text-xs"
-                    >
-                      {s}
-                      <button onClick={() => removeExtraSymbol(s)} className="text-violet-400 hover:text-red-400 ml-0.5">✕</button>
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
+      {/* ── Left: pipeline sections ── */}
+      <div className="card">
+        <div className="card-head">
+          <div>
+            <div className="card-title"><FilterIcon s={14} /> Pipeline de procesamiento</div>
+            <div className="card-sub">Las operaciones se ejecutan en orden, de arriba a abajo.</div>
           </div>
-        )}
-      </div>
+          <span className="badge violet">{activeCount} / 6 activas</span>
+        </div>
+        <div className="card-body" style={{ padding: 14 }}>
 
-      {/* Tokenización */}
-      <div className="bg-slate-900/40 border border-slate-700 rounded-xl p-4 space-y-3">
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={doTokenize}
-            onChange={e => onChange({ ...options, doTokenize: e.target.checked })}
-            className="accent-violet-500 w-4 h-4"
-          />
-          <span className="text-slate-200 font-medium">Tokenizar</span>
-        </label>
+          <PipeSection num="1" title="Convertir a minúsculas" hint="lowercase()"
+            open={openSections[1]} onToggle={() => toggleSection(1)}
+            enabled={opts.lowercase} onToggleEnabled={() => toggle('lowercase')}>
+            <div className="mute" style={{ fontSize: 12 }}>
+              Aplica <span className="mono" style={{ color: 'var(--mono-green)' }}>str.lower()</span> a todo el texto antes de la tokenización. Recomendado para reducir cardinalidad del vocabulario.
+            </div>
+          </PipeSection>
 
-        {doTokenize && (
-          <div className="ml-6 space-y-3">
-            <div className="flex flex-wrap gap-4">
+          <PipeSection num="2" title="Eliminar números" hint={'regex /\\d+/'}
+            open={openSections[2]} onToggle={() => toggleSection(2)}
+            enabled={opts.stripNumbers} onToggleEnabled={() => toggle('stripNumbers')}>
+            <div className="mute" style={{ fontSize: 12 }}>
+              Reemplaza secuencias numéricas por espacios. Útil para análisis temáticos donde los números no aportan significado.
+            </div>
+          </PipeSection>
+
+          <PipeSection num="3" title="Normalizar espacios" hint="collapse + trim"
+            open={openSections[3]} onToggle={() => toggleSection(3)}
+            enabled={opts.normalizeSpaces} onToggleEnabled={() => toggle('normalizeSpaces')}>
+            <div className="mute" style={{ fontSize: 12 }}>
+              Colapsa múltiples espacios, tabs y saltos de línea en un único espacio. Aplica <span className="mono" style={{ color: 'var(--mono-green)' }}>trim()</span> al final.
+            </div>
+          </PipeSection>
+
+          <PipeSection num="4" title="Limpiar símbolos" hint={`${opts.activeSymbols.length} activos`}
+            open={openSections[4]} onToggle={() => toggleSection(4)}
+            enabled={opts.removeSymbols} onToggleEnabled={() => toggle('removeSymbols')}>
+            <div className="mute" style={{ fontSize: 12, marginBottom: 10 }}>
+              Toca un chip para activar/desactivar su eliminación. Los símbolos activos se reemplazan por espacios.
+            </div>
+            <div className="row" style={{ flexWrap: 'wrap', gap: 6 }}>
+              {allSymbols.map(sym => {
+                const on = opts.activeSymbols.includes(sym)
+                const isExtra = opts.extraSymbols.includes(sym)
+                return (
+                  <span key={sym} className={'chip' + (on ? ' on' : '')} onClick={() => toggleSymbol(sym)}>
+                    <span>{sym}</span>
+                    {isExtra && (
+                      <span className="chip-x" onClick={(e) => { e.stopPropagation(); removeExtraSymbol(sym) }}>
+                        <XIcon s={11} />
+                      </span>
+                    )}
+                  </span>
+                )
+              })}
+            </div>
+            <div className="row" style={{ marginTop: 12, gap: 8 }}>
+              <input
+                className="input"
+                placeholder="Agregar símbolos extra (ej: §¶†‡)"
+                value={newSymbol}
+                onChange={(e) => setNewSymbol(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && addSymbol()}
+                style={{ flex: 1 }}
+              />
+              <button className="btn btn-sm" onClick={addSymbol}><PlusIcon s={12} /> Agregar</button>
+            </div>
+            <div className="mute mono" style={{ fontSize: 11, marginTop: 8 }}>
+              {opts.activeSymbols.length} de {allSymbols.length} símbolos serán eliminados
+            </div>
+          </PipeSection>
+
+          <PipeSection num="5" title="Tokenizar" hint={opts.tokenizeMode}
+            open={openSections[5]} onToggle={() => toggleSection(5)}
+            enabled={opts.tokenize} onToggleEnabled={() => toggle('tokenize')}>
+            <div className="mute" style={{ fontSize: 12, marginBottom: 10 }}>
+              Define cómo segmentar el texto en unidades atómicas.
+            </div>
+            <div className="radio-group">
               {[
-                { value: 'words', label: 'Palabras (word_tokenize)' },
-                { value: 'all', label: 'Palabras + símbolos (regexp_tokenize)' },
-                { value: 'chars', label: 'Caracteres (list)' },
+                { v: 'words',        t: 'Palabras',           d: 'word_tokenize()' },
+                { v: 'words+symbols', t: 'Palabras + símbolos', d: 'regexp \\w+|[^\\w\\s]' },
+                { v: 'chars',        t: 'Caracteres',          d: 'list(text)' },
               ].map(opt => (
-                <label key={opt.value} className="flex items-center gap-1.5 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="tokenMode"
-                    value={opt.value}
-                    checked={tokenMode === opt.value}
-                    onChange={() => onChange({ ...options, tokenMode: opt.value })}
-                    className="accent-violet-500"
-                  />
-                  <span className="text-sm text-slate-300">{opt.label}</span>
+                <label
+                  key={opt.v}
+                  className={'radio' + (opts.tokenizeMode === opt.v ? ' on' : '')}
+                  onClick={() => setOpts(o => ({ ...o, tokenizeMode: opt.v }))}
+                >
+                  <span className="dotr" />
+                  <span style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.2 }}>
+                    <span style={{ fontWeight: 500 }}>{opt.t}</span>
+                    <span className="mono mute" style={{ fontSize: 10.5, marginTop: 2 }}>{opt.d}</span>
+                  </span>
                 </label>
               ))}
             </div>
-            <p className="text-xs text-slate-400">{TOKEN_HELP[tokenMode]}</p>
-            <p className="text-xs text-slate-500">
-              La tokenización se aplica sobre el texto resultante después de las opciones de limpieza seleccionadas. Si se activa “Limpiar símbolos”, los símbolos eliminados ya no aparecerán como tokens.
-            </p>
-          </div>
-        )}
-      </div>
+          </PipeSection>
 
-      {/* Stopwords */}
-      <div className="bg-slate-900/40 border border-slate-700 rounded-xl p-4 space-y-3">
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={removeStopwords}
-            onChange={e => onChange({ ...options, removeStopwords: e.target.checked })}
-            className="accent-violet-500 w-4 h-4"
-          />
-          <span className="text-slate-200 font-medium">
-            Eliminar stopwords
-            <span className="ml-2 text-xs text-slate-500">
-              ({defaultStopwords.length} predefinidas ES+EN)
-            </span>
-          </span>
-        </label>
-
-        {removeStopwords && (
-          <div className="ml-6 space-y-2">
-            <p className="text-xs text-slate-400">Agregar stopwords personalizadas separadas por coma o Enter.</p>
-            <div className="flex gap-2">
-              <input
-                value={swInput}
-                onChange={e => setSwInput(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && addExtraStopword()}
-                placeholder="ej: también, however, además"
-                className="flex-1 bg-slate-900 text-slate-100 border border-slate-700 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-violet-500"
-              />
-              <button
-                onClick={addExtraStopword}
-                className="px-3 py-1.5 bg-violet-700 hover:bg-violet-600 text-white rounded-lg text-sm"
-              >
-                +
-              </button>
+          <PipeSection num="6" title="Eliminar stopwords" hint={`${totalStops} en lista`}
+            open={openSections[6]} onToggle={() => toggleSection(6)}
+            enabled={opts.removeStopwords} onToggleEnabled={() => toggle('removeStopwords')}>
+            <div className="mute" style={{ fontSize: 12, marginBottom: 10 }}>
+              Lista base: <span className="mono" style={{ color: 'var(--text)' }}>{defaultStopwords.length}</span> stopwords en español+inglés. Agrega palabras adicionales para tu dominio.
             </div>
-            {extraStopwords.length > 0 && (
-              <div className="flex flex-wrap gap-1.5">
-                {extraStopwords.map(w => (
-                  <span
-                    key={w}
-                    className="flex items-center gap-1 px-2 py-0.5 bg-violet-900/50 border border-violet-600 text-violet-200 rounded text-xs"
-                  >
-                    {w}
-                    <button onClick={() => removeExtraStopword(w)} className="text-violet-400 hover:text-red-400 ml-0.5">✕</button>
-                  </span>
-                ))}
-              </div>
+            <div className="row" style={{ gap: 8, marginBottom: 12 }}>
+              <input
+                className="input"
+                placeholder="Agregar stopwords (separar por coma o espacio)"
+                value={newStop}
+                onChange={(e) => setNewStop(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && addStop()}
+                style={{ flex: 1 }}
+              />
+              <button className="btn btn-sm" onClick={addStop}><PlusIcon s={12} /> Agregar</button>
+            </div>
+            {opts.customStopwords.length > 0 && (
+              <>
+                <div className="mute" style={{ fontSize: 11, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                  Personalizadas ({opts.customStopwords.length})
+                </div>
+                <div className="row" style={{ flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+                  {opts.customStopwords.map(w => (
+                    <span key={w} className="chip on">
+                      {w}
+                      <span className="chip-x" onClick={() => removeStop(w)}><XIcon s={11} /></span>
+                    </span>
+                  ))}
+                </div>
+              </>
             )}
-          </div>
-        )}
+            {defaultStopwords.length > 0 && (
+              <details style={{ marginTop: 4 }}>
+                <summary style={{ cursor: 'pointer', fontSize: 12, color: 'var(--text-dim)' }}>
+                  Ver lista base ({defaultStopwords.length})
+                </summary>
+                <div className="row" style={{ flexWrap: 'wrap', gap: 5, marginTop: 8 }}>
+                  {defaultStopwords.map(w => (
+                    <span key={w} className="chip" style={{ opacity: 0.7 }}>{w}</span>
+                  ))}
+                </div>
+              </details>
+            )}
+          </PipeSection>
+        </div>
       </div>
-    </section>
+
+      {/* ── Right: summary + pseudocode ── */}
+      <div className="stack" style={{ gap: 16 }}>
+
+        {/* Pipeline summary */}
+        <div className="card">
+          <div className="card-head">
+            <div className="card-title"><SigmaIcon s={14} /> Resumen del pipeline</div>
+          </div>
+          <div className="card-body">
+            <div className="stack" style={{ gap: 8 }}>
+              {[
+                ['1. Minúsculas',                     opts.lowercase],
+                ['2. Sin números',                    opts.stripNumbers],
+                ['3. Espacios normalizados',           opts.normalizeSpaces],
+                [`4. Símbolos (${opts.activeSymbols.length})`, opts.removeSymbols],
+                [`5. Tokenizar · ${opts.tokenizeMode}`, opts.tokenize],
+                [`6. Stopwords (${totalStops})`,      opts.removeStopwords],
+              ].map(([label, on], i) => (
+                <div
+                  key={i}
+                  className="row between"
+                  style={{
+                    padding: '8px 10px', borderRadius: 8,
+                    background: on ? 'rgba(124,58,237,0.06)' : 'rgba(2,6,23,0.4)',
+                    border: '1px solid',
+                    borderColor: on ? 'rgba(167,139,250,0.18)' : 'var(--line)',
+                  }}
+                >
+                  <span style={{ fontSize: 12.5, color: on ? 'var(--text)' : 'var(--text-mute)' }}>{label}</span>
+                  {on
+                    ? <span className="badge violet"><CheckIcon s={10} /> ON</span>
+                    : <span className="badge slate">OFF</span>
+                  }
+                </div>
+              ))}
+            </div>
+
+            <div className="divider" />
+
+            <button
+              className="btn btn-primary"
+              style={{ width: '100%', justifyContent: 'center', padding: '12px 16px' }}
+              onClick={onProcess}
+              disabled={loading}
+            >
+              <PlayIcon s={13} /> {loading ? 'Procesando…' : 'Procesar'}
+            </button>
+            <button
+              className="btn btn-ghost"
+              style={{ width: '100%', justifyContent: 'center', marginTop: 8 }}
+              onClick={onReset}
+            >
+              <ResetIcon s={13} /> Reiniciar pipeline
+            </button>
+          </div>
+        </div>
+
+        {/* Pseudocode preview */}
+        <div className="card">
+          <div className="card-head">
+            <div>
+              <div className="card-title">Vista previa del flujo</div>
+              <div className="card-sub">Pseudocódigo del pipeline configurado.</div>
+            </div>
+          </div>
+          <div className="card-body" style={{ padding: 0 }}>
+            <pre
+              className="mono"
+              style={{
+                margin: 0, padding: '14px 18px', fontSize: 12, lineHeight: 1.8,
+                color: 'var(--mono-green)', background: 'rgba(2,6,23,0.5)',
+                whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+              }}
+            >
+              {pseudocode}
+            </pre>
+          </div>
+        </div>
+      </div>
+    </div>
   )
 }

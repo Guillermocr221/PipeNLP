@@ -1,0 +1,1147 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>PipeNLP — Preprocesamiento NLP</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #020617;
+    --bg-1: #0b1220;
+    --bg-2: #0f172a;
+    --bg-3: #1e293b;
+    --bg-4: #334155;
+    --line: rgba(148, 163, 184, 0.12);
+    --line-strong: rgba(148, 163, 184, 0.22);
+    --text: #e2e8f0;
+    --text-dim: #94a3b8;
+    --text-mute: #64748b;
+    --violet: #7c3aed;
+    --violet-2: #8b5cf6;
+    --violet-soft: rgba(124, 58, 237, 0.15);
+    --green: #22c55e;
+    --green-soft: rgba(34, 197, 94, 0.12);
+    --mono-green: #4ade80;
+    --amber: #f59e0b;
+    --red: #ef4444;
+    --blue: #38bdf8;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  body {
+    min-height: 100vh;
+    background:
+      radial-gradient(1200px 600px at 80% -10%, rgba(124,58,237,0.08), transparent 60%),
+      radial-gradient(900px 500px at -10% 30%, rgba(56,189,248,0.05), transparent 60%),
+      var(--bg);
+  }
+  ::selection { background: var(--violet-soft); color: #fff; }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(148,163,184,0.18); border-radius: 8px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(148,163,184,0.32); }
+  .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+  button { font-family: inherit; cursor: pointer; }
+  input, textarea, select { font-family: inherit; color: inherit; }
+
+  .app { max-width: 1320px; margin: 0 auto; padding: 28px 32px 80px; }
+  .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand-mark {
+    width: 36px; height: 36px; border-radius: 9px;
+    background: linear-gradient(135deg, #7c3aed, #a78bfa);
+    display: grid; place-items: center;
+    box-shadow: 0 8px 24px -10px rgba(124,58,237,0.6), inset 0 1px 0 rgba(255,255,255,0.18);
+    position: relative;
+  }
+  .brand-mark::after {
+    content: ""; position: absolute; inset: 6px;
+    border: 1.5px solid rgba(255,255,255,0.55); border-radius: 5px;
+    border-right-color: transparent; border-bottom-color: transparent;
+    transform: rotate(45deg);
+  }
+  .brand-name { font-weight: 700; font-size: 17px; letter-spacing: -0.01em; }
+  .brand-sub { font-size: 12px; color: var(--text-dim); margin-top: 1px; }
+  .topbar-right { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--text-dim); }
+  .pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 5px 10px; border-radius: 999px;
+    background: var(--bg-2); border: 1px solid var(--line);
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px var(--green); }
+
+  .stepper {
+    background: linear-gradient(180deg, rgba(15,23,42,0.7), rgba(15,23,42,0.4));
+    border: 1px solid var(--line); border-radius: 14px;
+    padding: 14px 18px;
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 22px; backdrop-filter: blur(8px);
+  }
+  .step {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 12px; border-radius: 10px; flex: 1;
+    cursor: pointer; transition: background 0.15s; user-select: none;
+  }
+  .step:hover { background: rgba(148,163,184,0.05); }
+  .step-num {
+    width: 26px; height: 26px; border-radius: 50%;
+    background: var(--bg-3); color: var(--text-dim);
+    display: grid; place-items: center;
+    font-weight: 600; font-size: 12px; border: 1px solid var(--line);
+    flex-shrink: 0; transition: all 0.2s;
+  }
+  .step.active .step-num { background: var(--violet); color: white; border-color: transparent; box-shadow: 0 0 0 4px var(--violet-soft); }
+  .step.done .step-num { background: var(--green-soft); color: var(--green); border-color: rgba(34,197,94,0.3); }
+  .step-label { display: flex; flex-direction: column; line-height: 1.2; min-width: 0; }
+  .step-label .t { font-size: 13px; font-weight: 600; color: var(--text); }
+  .step-label .s { font-size: 11px; color: var(--text-mute); margin-top: 1px; }
+  .step.active .step-label .t { color: white; }
+  .step-sep { color: var(--text-mute); font-size: 14px; padding: 0 4px; }
+
+  .card {
+    background: linear-gradient(180deg, rgba(15,23,42,0.6), rgba(15,23,42,0.3));
+    border: 1px solid var(--line); border-radius: 14px; overflow: hidden;
+  }
+  .card-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 20px; border-bottom: 1px solid var(--line);
+  }
+  .card-title { font-weight: 600; font-size: 14px; letter-spacing: -0.01em; }
+  .card-sub { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+  .card-body { padding: 20px; }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 10px 16px; border-radius: 9px; border: 1px solid var(--line);
+    background: var(--bg-3); color: var(--text); font-size: 13px; font-weight: 500; transition: all 0.15s;
+  }
+  .btn:hover { background: var(--bg-4); border-color: var(--line-strong); }
+  .btn-primary {
+    background: linear-gradient(180deg, #8b5cf6, #7c3aed);
+    border: 1px solid rgba(167,139,250,0.4); color: white; font-weight: 600;
+    box-shadow: 0 6px 20px -8px rgba(124,58,237,0.8), inset 0 1px 0 rgba(255,255,255,0.15);
+  }
+  .btn-primary:hover { filter: brightness(1.08); }
+  .btn-ghost { background: transparent; border-color: var(--line); color: var(--text-dim); }
+  .btn-ghost:hover { background: var(--bg-2); color: var(--text); }
+  .btn-sm { padding: 6px 10px; font-size: 12px; }
+  .btn-icon { padding: 8px; }
+
+  .input, .textarea, .select {
+    width: 100%; background: var(--bg-1); border: 1px solid var(--line);
+    border-radius: 9px; padding: 10px 12px; color: var(--text); font-size: 13px;
+    outline: none; transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .input:focus, .textarea:focus, .select:focus { border-color: var(--violet); box-shadow: 0 0 0 3px var(--violet-soft); }
+  .textarea { resize: vertical; min-height: 280px; font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 1.6; }
+
+  .check {
+    width: 18px; height: 18px; border-radius: 5px; border: 1.5px solid var(--line-strong);
+    background: var(--bg-1); display: inline-grid; place-items: center;
+    flex-shrink: 0; transition: all 0.15s; cursor: pointer;
+  }
+  .check.on { background: var(--violet); border-color: var(--violet-2); }
+  .check.on::after {
+    content: ""; width: 10px; height: 6px;
+    border-left: 2px solid white; border-bottom: 2px solid white;
+    transform: rotate(-45deg) translate(1px, -1px);
+  }
+
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px;
+    border-radius: 7px; background: var(--bg-2); border: 1px solid var(--line);
+    color: var(--text-dim); font-family: 'JetBrains Mono', monospace; font-size: 12px;
+    cursor: pointer; transition: all 0.12s; user-select: none;
+  }
+  .chip:hover { border-color: var(--line-strong); color: var(--text); }
+  .chip.on { background: var(--violet-soft); border-color: rgba(167,139,250,0.45); color: #c4b5fd; }
+  .chip-x { color: var(--text-mute); margin-left: 2px; font-size: 13px; line-height: 1; }
+  .chip-x:hover { color: var(--red); }
+
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px;
+    border-radius: 6px; font-size: 11px; font-weight: 500; font-family: 'JetBrains Mono', monospace;
+  }
+  .badge.violet { background: var(--violet-soft); color: #c4b5fd; border: 1px solid rgba(167,139,250,0.25); }
+  .badge.green { background: var(--green-soft); color: #86efac; border: 1px solid rgba(34,197,94,0.25); }
+  .badge.amber { background: rgba(245,158,11,0.12); color: #fcd34d; border: 1px solid rgba(245,158,11,0.25); }
+  .badge.slate { background: var(--bg-3); color: var(--text-dim); border: 1px solid var(--line); }
+
+  .section { border: 1px solid var(--line); border-radius: 11px; background: rgba(15,23,42,0.45); overflow: hidden; }
+  .section + .section { margin-top: 10px; }
+  .section-head {
+    display: flex; align-items: center; gap: 12px; padding: 14px 16px;
+    cursor: pointer; user-select: none; transition: background 0.12s;
+  }
+  .section-head:hover { background: rgba(148,163,184,0.04); }
+  .section-num {
+    width: 22px; height: 22px; border-radius: 6px; background: var(--bg-3); color: var(--text-dim);
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; display: grid; place-items: center; flex-shrink: 0;
+  }
+  .section-title { font-weight: 600; font-size: 13px; flex: 1; }
+  .section-chev { color: var(--text-mute); transition: transform 0.2s; }
+  .section.open .section-chev { transform: rotate(180deg); }
+  .section-body { padding: 4px 16px 16px; border-top: 1px solid var(--line); background: rgba(2,6,23,0.4); }
+
+  .tabs { display: flex; border-bottom: 1px solid var(--line); gap: 2px; padding: 0 4px; }
+  .tab {
+    padding: 12px 18px; color: var(--text-dim); font-size: 13px; font-weight: 500;
+    border: none; background: transparent; border-bottom: 2px solid transparent; margin-bottom: -1px;
+    cursor: pointer; transition: color 0.15s, border-color 0.15s;
+    display: inline-flex; align-items: center; gap: 8px;
+  }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: white; border-bottom-color: var(--violet); }
+  .tab .count {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    background: var(--bg-3); padding: 1px 6px; border-radius: 4px; color: var(--text-dim);
+  }
+  .tab.active .count { background: var(--violet-soft); color: #c4b5fd; }
+
+  .metric {
+    border: 1px solid var(--line); border-radius: 11px; padding: 16px;
+    background: linear-gradient(180deg, rgba(30,41,59,0.5), rgba(15,23,42,0.3));
+    position: relative; overflow: hidden;
+  }
+  .metric-label {
+    font-size: 11px; color: var(--text-dim); text-transform: uppercase;
+    letter-spacing: 0.06em; font-weight: 500; display: flex; align-items: center; gap: 6px;
+  }
+  .metric-value {
+    font-family: 'JetBrains Mono', monospace; font-size: 28px; font-weight: 600;
+    color: white; margin-top: 6px; letter-spacing: -0.02em;
+  }
+  .metric-delta { font-size: 11px; color: var(--text-mute); margin-top: 4px; font-family: 'JetBrains Mono', monospace; }
+
+  .tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .tbl th {
+    text-align: left; color: var(--text-dim); font-weight: 500; font-size: 11px;
+    text-transform: uppercase; letter-spacing: 0.06em; padding: 10px 12px;
+    border-bottom: 1px solid var(--line); background: rgba(15,23,42,0.5);
+  }
+  .tbl td { padding: 9px 12px; border-bottom: 1px solid var(--line); font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+  .tbl tr:hover td { background: rgba(148,163,184,0.03); }
+  .freq-bar { height: 6px; background: var(--bg-3); border-radius: 3px; overflow: hidden; min-width: 80px; }
+  .freq-fill { height: 100%; background: linear-gradient(90deg, #7c3aed, #a78bfa); border-radius: 3px; }
+
+  .radio-group { display: flex; gap: 6px; flex-wrap: wrap; }
+  .radio {
+    flex: 1; min-width: 120px; padding: 11px 14px; border-radius: 9px;
+    border: 1px solid var(--line); background: var(--bg-1); font-size: 13px;
+    color: var(--text-dim); cursor: pointer; transition: all 0.12s;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .radio:hover { border-color: var(--line-strong); color: var(--text); }
+  .radio .dotr { width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid var(--line-strong); display: grid; place-items: center; flex-shrink: 0; }
+  .radio.on { border-color: var(--violet); background: var(--violet-soft); color: white; }
+  .radio.on .dotr { border-color: var(--violet-2); }
+  .radio.on .dotr::after { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--violet-2); }
+
+  .dropzone {
+    border: 1.5px dashed var(--line-strong); border-radius: 11px; padding: 28px 20px;
+    text-align: center; background: rgba(15,23,42,0.3); transition: all 0.15s; cursor: pointer;
+  }
+  .dropzone:hover { border-color: var(--violet); background: var(--violet-soft); }
+  .dropzone.over { border-color: var(--violet); background: var(--violet-soft); }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+  .grid-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  @media (min-width: 1100px) { .grid-metrics { grid-template-columns: repeat(6, 1fr); } }
+
+  .formulas { background: rgba(2,6,23,0.6); border: 1px solid var(--line); border-radius: 11px; overflow: hidden; }
+  .formulas-head { padding: 12px 16px; display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; }
+  .formulas-head:hover { background: rgba(148,163,184,0.04); }
+  .formulas-body {
+    border-top: 1px solid var(--line); padding: 14px 18px;
+    font-family: 'JetBrains Mono', monospace; font-size: 12.5px; line-height: 1.85; color: var(--mono-green);
+    background: linear-gradient(180deg, rgba(34,197,94,0.04), transparent), rgba(2,6,23,0.7);
+  }
+  .formulas-body .fline { display: flex; gap: 14px; }
+  .formulas-body .fline .num { color: rgba(74,222,128,0.4); user-select: none; min-width: 24px; text-align: right; }
+  .formulas-body .fline .step-lbl { color: #94a3b8; }
+
+  .code-col {
+    background: var(--bg-1); border: 1px solid var(--line); border-radius: 9px; padding: 14px;
+    font-family: 'JetBrains Mono', monospace; font-size: 12.5px; line-height: 1.7; color: var(--text-dim);
+    max-height: 360px; overflow: auto; white-space: pre-wrap; word-break: break-word;
+  }
+  .code-col .h {
+    font-family: 'Inter', sans-serif; font-size: 11px; color: var(--text-mute);
+    text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 10px;
+    display: flex; align-items: center; justify-content: space-between; font-weight: 500;
+  }
+  .token { display: inline-block; padding: 1px 6px; border-radius: 5px; background: var(--bg-3); margin: 2px 3px 2px 0; color: var(--text); font-size: 11.5px; }
+  .token.removed { background: rgba(239,68,68,0.12); color: #fca5a5; text-decoration: line-through; opacity: 0.7; }
+  .token.kept { background: rgba(124,58,237,0.18); color: #c4b5fd; }
+
+  .footer-bar {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-top: 22px; padding: 14px 18px;
+    background: rgba(15,23,42,0.5); border: 1px solid var(--line); border-radius: 12px;
+  }
+  .footer-bar .left { display: flex; gap: 10px; align-items: center; }
+  .footer-bar .right { display: flex; gap: 10px; }
+
+  .row { display: flex; align-items: center; gap: 10px; }
+  .row.between { justify-content: space-between; }
+  .stack { display: flex; flex-direction: column; gap: 10px; }
+  .muted { color: var(--text-dim); }
+  .mute { color: var(--text-mute); }
+  .nowrap { white-space: nowrap; }
+  .divider { height: 1px; background: var(--line); margin: 12px 0; }
+  svg { display: inline-block; vertical-align: middle; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel">
+const { useState, useRef, useMemo } = React;
+
+// ===== Icons =====
+const Ic = {
+  Check:    (p) => <svg width={p.s||14} height={p.s||14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>,
+  X:        (p) => <svg width={p.s||14} height={p.s||14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
+  Chev:     (p) => <svg width={p.s||14} height={p.s||14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>,
+  Upload:   (p) => <svg width={p.s||16} height={p.s||16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>,
+  Download: (p) => <svg width={p.s||14} height={p.s||14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>,
+  File:     (p) => <svg width={p.s||14} height={p.s||14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>,
+  Trash:    (p) => <svg width={p.s||14} height={p.s||14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>,
+  Play:     (p) => <svg width={p.s||14} height={p.s||14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3" fill="currentColor"/></svg>,
+  Reset:    (p) => <svg width={p.s||14} height={p.s||14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>,
+  Save:     (p) => <svg width={p.s||14} height={p.s||14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>,
+  Sigma:    (p) => <svg width={p.s||14} height={p.s||14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M18 5H6l7 7-7 7h12"/></svg>,
+  Spark:    (p) => <svg width={p.s||14} height={p.s||14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/></svg>,
+  Hash:     (p) => <svg width={p.s||14} height={p.s||14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg>,
+  Type:     (p) => <svg width={p.s||14} height={p.s||14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>,
+  Filter:   (p) => <svg width={p.s||14} height={p.s||14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>,
+  Plus:     (p) => <svg width={p.s||12} height={p.s||12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>,
+  Table:    (p) => <svg width={p.s||14} height={p.s||14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/></svg>,
+  Doc:      (p) => <svg width={p.s||14} height={p.s||14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>,
+  Bars:     (p) => <svg width={p.s||14} height={p.s||14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>,
+  Compare:  (p) => <svg width={p.s||14} height={p.s||14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg>,
+  Token:    (p) => <svg width={p.s||14} height={p.s||14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="6" width="6" height="12" rx="1.5"/><rect x="11" y="6" width="4" height="12" rx="1.5"/><rect x="17" y="6" width="4" height="12" rx="1.5"/></svg>,
+};
+
+// ===== Data =====
+const SAMPLE_TEXT = `El procesamiento de Lenguaje Natural (NLP) es un campo de la Inteligencia Artificial que estudia las interacciones entre las computadoras y el lenguaje humano. En 2024, los modelos NLP procesaron más de 1500 millones de textos diariamente; ¿impresionante, verdad?
+
+Las técnicas modernas incluyen: tokenización, lematización, stemming, y embeddings vectoriales. Cada técnica resuelve un problema específico — por ejemplo, la tokenización segmenta el texto en unidades llamadas tokens.
+
+Herramientas populares: NLTK, spaCy, Hugging Face Transformers. ¡La elección depende del caso de uso! Muchos investigadores combinan estas librerías con frameworks como PyTorch o TensorFlow para entrenar redes neuronales profundas.
+
+Un pipeline típico de preprocesamiento incluye 5 pasos: 1) limpieza, 2) normalización, 3) tokenización, 4) eliminación de stopwords y 5) vectorización. Cada paso reduce la dimensionalidad y mejora la calidad del modelo.`;
+
+const DEFAULT_SYMBOLS = [
+  '.', ',', ';', ':', '!', '?', '¿', '¡', '"', "'", '“', '”',
+  '(', ')', '[', ']', '{', '}', '—', '–', '-', '_',
+  '/', '\\', '|', '@', '#', '$', '%', '&', '*', '+', '=',
+  '<', '>', '~', '`', '^', '°', '€', '£', '·'
+];
+
+const DEFAULT_STOPWORDS = [
+  'el','la','los','las','un','una','unos','unas','de','del','a','al','en','y','o','u','e','que','como','con','por','para','sin','sobre','entre','es','son','fue','ser','este','esta','estos','estas','su','sus','le','les','lo','más','menos','muy','también','pero','si','no','ya','así','cada','cuando','donde'
+];
+
+const SAMPLE_TOKENS_BEFORE = [
+  'el','procesamiento','de','lenguaje','natural','nlp','es','un','campo','de','la','inteligencia','artificial','que','estudia','las','interacciones','entre','las','computadoras','y','el','lenguaje','humano','en','los','modelos','nlp','procesaron','más','de','millones','de','textos','diariamente','impresionante','verdad','las','técnicas','modernas','incluyen','tokenización','lematización','stemming','y','embeddings','vectoriales','cada','técnica','resuelve','un','problema','específico','por','ejemplo','la','tokenización','segmenta','el','texto','en','unidades','llamadas','tokens','herramientas','populares','nltk','spacy','hugging','face','transformers','la','elección','depende','del','caso','de','uso','muchos','investigadores','combinan','estas','librerías','con','frameworks','como','pytorch','o','tensorflow','para','entrenar','redes','neuronales','profundas','un','pipeline','típico','de','preprocesamiento','incluye','pasos','limpieza','normalización','tokenización','eliminación','de','stopwords','y','vectorización','cada','paso','reduce','la','dimensionalidad','y','mejora','la','calidad','del','modelo'
+];
+
+const SAMPLE_TOKENS_AFTER = SAMPLE_TOKENS_BEFORE.filter(t => !DEFAULT_STOPWORDS.includes(t));
+
+function computeFreq(tokens) {
+  const m = new Map();
+  for (const t of tokens) m.set(t, (m.get(t) || 0) + 1);
+  return [...m.entries()].sort((a, b) => b[1] - a[1]).map(([token, count], i) => ({ rank: i + 1, token, count, freq: count / tokens.length }));
+}
+
+const SAMPLE_FREQ = computeFreq(SAMPLE_TOKENS_AFTER);
+
+const SAMPLE_CLEAN = `el procesamiento de lenguaje natural nlp es un campo de la inteligencia artificial que estudia las interacciones entre las computadoras y el lenguaje humano en los modelos nlp procesaron más de millones de textos diariamente impresionante verdad las técnicas modernas incluyen tokenización lematización stemming y embeddings vectoriales cada técnica resuelve un problema específico por ejemplo la tokenización segmenta el texto en unidades llamadas tokens herramientas populares nltk spacy hugging face transformers la elección depende del caso de uso muchos investigadores combinan estas librerías con frameworks como pytorch o tensorflow para entrenar redes neuronales profundas un pipeline típico de preprocesamiento incluye pasos limpieza normalización tokenización eliminación de stopwords y vectorización cada paso reduce la dimensionalidad y mejora la calidad del modelo`;
+
+const SAMPLE_METRICS = {
+  wordsOriginal: 220,
+  tokensFinal: SAMPLE_TOKENS_AFTER.length,
+  tokensUnique: new Set(SAMPLE_TOKENS_AFTER).size,
+  stopwordsRemoved: SAMPLE_TOKENS_BEFORE.length - SAMPLE_TOKENS_AFTER.length,
+  reductionPct: ((SAMPLE_TOKENS_BEFORE.length - SAMPLE_TOKENS_AFTER.length) / SAMPLE_TOKENS_BEFORE.length * 100),
+  topToken: SAMPLE_FREQ[0] || { token: '—', count: 0 },
+};
+
+// ===== Step 1 =====
+function Step1Ingreso({ text, setText }) {
+  const [dragOver, setDragOver] = useState(false);
+  const [filename, setFilename] = useState(null);
+  const fileRef = useRef(null);
+
+  const charCount = text.length;
+  const wordCount = text.trim() ? text.trim().split(/\s+/).length : 0;
+  const lineCount = text ? text.split('\n').length : 0;
+
+  function handleFile(file) {
+    if (!file || !file.name.endsWith('.txt')) return;
+    setFilename(file.name);
+    const reader = new FileReader();
+    reader.onload = (e) => setText(String(e.target.result || ''));
+    reader.readAsText(file);
+  }
+
+  function onDrop(e) {
+    e.preventDefault();
+    setDragOver(false);
+    handleFile(e.dataTransfer.files?.[0]);
+  }
+
+  return (
+    <div className="grid-2">
+      <div className="card">
+        <div className="card-head">
+          <div>
+            <div className="card-title row" style={{ gap: 8 }}><Ic.Type s={14} /> Editor de texto</div>
+            <div className="card-sub">Pega o escribe tu corpus. El texto se conserva entre pasos.</div>
+          </div>
+          <div className="row" style={{ gap: 8 }}>
+            <button className="btn btn-sm btn-ghost" onClick={() => setText(SAMPLE_TEXT)}><Ic.Spark s={12} /> Cargar ejemplo</button>
+            <button className="btn btn-sm btn-ghost" onClick={() => { setText(''); setFilename(null); }} disabled={!text} style={{ opacity: text ? 1 : 0.5 }}><Ic.Trash s={12} /> Limpiar texto</button>
+          </div>
+        </div>
+        <div className="card-body">
+          <textarea
+            className="textarea"
+            placeholder={"Escribe o pega tu texto aquí…\n\nEjemplo: artículos, reseñas, transcripciones, logs."}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+          />
+          <div className="row between" style={{ marginTop: 12 }}>
+            <div className="row" style={{ gap: 8 }}>
+              <span className="badge slate"><Ic.Hash s={11} /> {charCount.toLocaleString()} caracteres</span>
+              <span className="badge slate"><Ic.Type s={11} /> {wordCount.toLocaleString()} palabras</span>
+              <span className="badge slate">{lineCount.toLocaleString()} líneas</span>
+            </div>
+            {filename && <span className="badge green"><Ic.File s={11} /> {filename}</span>}
+          </div>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="card-head">
+          <div>
+            <div className="card-title row" style={{ gap: 8 }}><Ic.Upload s={14} /> Carga de archivo</div>
+            <div className="card-sub">Arrastra un archivo .txt o selecciónalo manualmente.</div>
+          </div>
+        </div>
+        <div className="card-body">
+          <div
+            className={"dropzone " + (dragOver ? 'over' : '')}
+            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={onDrop}
+            onClick={() => fileRef.current?.click()}
+          >
+            <div style={{ width: 48, height: 48, borderRadius: 12, background: 'var(--violet-soft)', display: 'grid', placeItems: 'center', margin: '0 auto 12px', color: '#c4b5fd' }}>
+              <Ic.Upload s={22} />
+            </div>
+            <div style={{ fontSize: 14, color: 'var(--text)', fontWeight: 500 }}>Arrastra tu archivo aquí</div>
+            <div className="mute" style={{ fontSize: 12, marginTop: 4 }}>o haz clic para examinar · formatos: <span className="mono">.txt</span> · máx 5 MB</div>
+            <input ref={fileRef} type="file" accept=".txt" hidden onChange={(e) => handleFile(e.target.files?.[0])} />
+          </div>
+
+          <div className="divider" />
+
+          <div className="stack" style={{ gap: 8 }}>
+            <div className="row between" style={{ fontSize: 12 }}><span className="mute">Encoding</span><span className="mono">UTF-8</span></div>
+            <div className="row between" style={{ fontSize: 12 }}><span className="mute">Línea final</span><span className="mono">LF (Unix)</span></div>
+            <div className="row between" style={{ fontSize: 12 }}><span className="mute">Idioma detectado</span><span className="mono">es · 98.4%</span></div>
+          </div>
+
+          <div style={{ marginTop: 16, padding: '12px 14px', background: 'rgba(56,189,248,0.05)', border: '1px solid rgba(56,189,248,0.18)', borderRadius: 9, fontSize: 12, color: 'var(--text-dim)' }}>
+            <strong style={{ color: '#7dd3fc' }}>Tip:</strong> también puedes pegar texto multilinea directamente en el editor. Los saltos de línea se preservarán hasta el paso de tokenización.
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ===== Step 2 =====
+function PipeSection({ num, title, hint, open, onToggle, enabled, onToggleEnabled, children }) {
+  return (
+    <div className={"section " + (open ? 'open' : '')}>
+      <div className="section-head" onClick={onToggle}>
+        <div className="section-num">{num}</div>
+        <div
+          className="check"
+          onClick={(e) => { e.stopPropagation(); onToggleEnabled?.(); }}
+          style={{ background: enabled ? 'var(--violet)' : 'var(--bg-1)', borderColor: enabled ? 'var(--violet-2)' : 'var(--line-strong)' }}
+        >
+          {enabled && <div style={{ width: 10, height: 6, borderLeft: '2px solid white', borderBottom: '2px solid white', transform: 'rotate(-45deg) translate(1px, -1px)' }} />}
+        </div>
+        <div className="section-title">{title}</div>
+        {hint && <div className="mute mono" style={{ fontSize: 11 }}>{hint}</div>}
+        <div className="section-chev"><Ic.Chev s={16} /></div>
+      </div>
+      {open && <div className="section-body">{children}</div>}
+    </div>
+  );
+}
+
+function Step2Opciones({ opts, setOpts, onProcess, onReset }) {
+  const [openSections, setOpenSections] = useState({ 1: false, 2: false, 3: false, 4: true, 5: true, 6: true });
+  const [newSymbol, setNewSymbol] = useState('');
+  const [newStop, setNewStop] = useState('');
+
+  const toggleSection = (n) => setOpenSections(s => ({ ...s, [n]: !s[n] }));
+
+  const toggleSymbol = (sym) => {
+    setOpts(o => {
+      const set = new Set(o.activeSymbols);
+      if (set.has(sym)) set.delete(sym); else set.add(sym);
+      return { ...o, activeSymbols: [...set] };
+    });
+  };
+
+  const addSymbol = () => {
+    if (!newSymbol.trim()) return;
+    setOpts(o => ({
+      ...o,
+      extraSymbols: [...new Set([...o.extraSymbols, ...newSymbol.split('').filter(c => c.trim())])],
+      activeSymbols: [...new Set([...o.activeSymbols, ...newSymbol.split('').filter(c => c.trim())])]
+    }));
+    setNewSymbol('');
+  };
+
+  const removeExtraSymbol = (sym) => {
+    setOpts(o => ({
+      ...o,
+      extraSymbols: o.extraSymbols.filter(s => s !== sym),
+      activeSymbols: o.activeSymbols.filter(s => s !== sym),
+    }));
+  };
+
+  const addStop = () => {
+    if (!newStop.trim()) return;
+    const words = newStop.toLowerCase().split(/[\s,]+/).filter(Boolean);
+    setOpts(o => ({ ...o, customStopwords: [...new Set([...o.customStopwords, ...words])] }));
+    setNewStop('');
+  };
+
+  const removeStop = (w) => setOpts(o => ({ ...o, customStopwords: o.customStopwords.filter(s => s !== w) }));
+
+  const allSymbols = [...DEFAULT_SYMBOLS, ...opts.extraSymbols];
+
+  return (
+    <div className="grid-2" style={{ gridTemplateColumns: '1.4fr 1fr', alignItems: 'start' }}>
+      <div className="card">
+        <div className="card-head">
+          <div>
+            <div className="card-title row" style={{ gap: 8 }}><Ic.Filter s={14} /> Pipeline de procesamiento</div>
+            <div className="card-sub">Las operaciones se ejecutan en orden, de arriba a abajo.</div>
+          </div>
+          <span className="badge violet">{[opts.lowercase, opts.stripNumbers, opts.normalizeSpaces, opts.removeSymbols, opts.tokenize, opts.removeStopwords].filter(Boolean).length} / 6 activas</span>
+        </div>
+        <div className="card-body" style={{ padding: 14 }}>
+
+          <PipeSection num="1" title="Convertir a minúsculas" hint="lowercase()" open={openSections[1]} onToggle={() => toggleSection(1)} enabled={opts.lowercase} onToggleEnabled={() => setOpts(o => ({ ...o, lowercase: !o.lowercase }))}>
+            <div className="mute" style={{ fontSize: 12 }}>Aplica <span className="mono" style={{ color: 'var(--mono-green)' }}>str.toLowerCase()</span> a todo el texto antes de la tokenización. Recomendado para reducir cardinalidad del vocabulario.</div>
+          </PipeSection>
+
+          <PipeSection num="2" title="Eliminar números" hint="regex /\d+/" open={openSections[2]} onToggle={() => toggleSection(2)} enabled={opts.stripNumbers} onToggleEnabled={() => setOpts(o => ({ ...o, stripNumbers: !o.stripNumbers }))}>
+            <div className="mute" style={{ fontSize: 12 }}>Reemplaza secuencias numéricas por espacios. Útil para análisis temáticos donde los números no aportan significado.</div>
+          </PipeSection>
+
+          <PipeSection num="3" title="Normalizar espacios" hint="collapse + trim" open={openSections[3]} onToggle={() => toggleSection(3)} enabled={opts.normalizeSpaces} onToggleEnabled={() => setOpts(o => ({ ...o, normalizeSpaces: !o.normalizeSpaces }))}>
+            <div className="mute" style={{ fontSize: 12 }}>Colapsa múltiples espacios, tabs y saltos de línea en un único espacio. Aplica <span className="mono" style={{ color: 'var(--mono-green)' }}>trim()</span> al final.</div>
+          </PipeSection>
+
+          <PipeSection num="4" title="Limpiar símbolos" hint={`${opts.activeSymbols.length} activos`} open={openSections[4]} onToggle={() => toggleSection(4)} enabled={opts.removeSymbols} onToggleEnabled={() => setOpts(o => ({ ...o, removeSymbols: !o.removeSymbols }))}>
+            <div className="mute" style={{ fontSize: 12, marginBottom: 10 }}>Toca un chip para activar/desactivar su eliminación. Los símbolos activos se reemplazan por espacios.</div>
+            <div className="row" style={{ flexWrap: 'wrap', gap: 6 }}>
+              {allSymbols.map(s => {
+                const on = opts.activeSymbols.includes(s);
+                const isExtra = opts.extraSymbols.includes(s);
+                return (
+                  <span key={s} className={"chip " + (on ? 'on' : '')} onClick={() => toggleSymbol(s)}>
+                    <span>{s}</span>
+                    {isExtra && <span className="chip-x" onClick={(e) => { e.stopPropagation(); removeExtraSymbol(s); }}><Ic.X s={11} /></span>}
+                  </span>
+                );
+              })}
+            </div>
+            <div className="row" style={{ marginTop: 12, gap: 8 }}>
+              <input className="input" placeholder="Agregar símbolos extra (ej: §¶†‡)" value={newSymbol} onChange={(e) => setNewSymbol(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addSymbol()} style={{ flex: 1 }} />
+              <button className="btn btn-sm" onClick={addSymbol}><Ic.Plus s={12} /> Agregar</button>
+            </div>
+            <div className="mute mono" style={{ fontSize: 11, marginTop: 8 }}>{opts.activeSymbols.length} de {allSymbols.length} símbolos serán eliminados</div>
+          </PipeSection>
+
+          <PipeSection num="5" title="Tokenizar" hint={opts.tokenizeMode} open={openSections[5]} onToggle={() => toggleSection(5)} enabled={opts.tokenize} onToggleEnabled={() => setOpts(o => ({ ...o, tokenize: !o.tokenize }))}>
+            <div className="mute" style={{ fontSize: 12, marginBottom: 10 }}>Define cómo segmentar el texto en unidades atómicas.</div>
+            <div className="radio-group">
+              {[
+                { v: 'words', t: 'Palabras', d: 'split /\\s+/' },
+                { v: 'words+symbols', t: 'Palabras + símbolos', d: 'regex \\w+|[^\\w\\s]' },
+                { v: 'chars', t: 'Caracteres', d: 'Array.from(text)' },
+              ].map(opt => (
+                <label key={opt.v} className={"radio " + (opts.tokenizeMode === opt.v ? 'on' : '')} onClick={() => setOpts(o => ({ ...o, tokenizeMode: opt.v }))}>
+                  <span className="dotr" />
+                  <span style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.2 }}>
+                    <span style={{ fontWeight: 500 }}>{opt.t}</span>
+                    <span className="mono mute" style={{ fontSize: 10.5, marginTop: 2 }}>{opt.d}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+          </PipeSection>
+
+          <PipeSection num="6" title="Eliminar stopwords" hint={`${opts.customStopwords.length + DEFAULT_STOPWORDS.length} en lista`} open={openSections[6]} onToggle={() => toggleSection(6)} enabled={opts.removeStopwords} onToggleEnabled={() => setOpts(o => ({ ...o, removeStopwords: !o.removeStopwords }))}>
+            <div className="mute" style={{ fontSize: 12, marginBottom: 10 }}>Lista base: <span className="mono" style={{ color: 'var(--text)' }}>{DEFAULT_STOPWORDS.length}</span> stopwords en español. Agrega palabras adicionales para tu dominio.</div>
+            <div className="row" style={{ gap: 8, marginBottom: 12 }}>
+              <input className="input" placeholder="Agregar stopwords (separar por coma o espacio)" value={newStop} onChange={(e) => setNewStop(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addStop()} style={{ flex: 1 }} />
+              <button className="btn btn-sm" onClick={addStop}><Ic.Plus s={12} /> Agregar</button>
+            </div>
+            {opts.customStopwords.length > 0 && (
+              <>
+                <div className="mute" style={{ fontSize: 11, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Personalizadas ({opts.customStopwords.length})</div>
+                <div className="row" style={{ flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+                  {opts.customStopwords.map(w => (
+                    <span key={w} className="chip on">{w}<span className="chip-x" onClick={() => removeStop(w)}><Ic.X s={11} /></span></span>
+                  ))}
+                </div>
+              </>
+            )}
+            <details style={{ marginTop: 4 }}>
+              <summary style={{ cursor: 'pointer', fontSize: 12, color: 'var(--text-dim)' }}>Ver lista base ({DEFAULT_STOPWORDS.length})</summary>
+              <div className="row" style={{ flexWrap: 'wrap', gap: 5, marginTop: 8 }}>
+                {DEFAULT_STOPWORDS.map(w => <span key={w} className="chip" style={{ opacity: 0.7 }}>{w}</span>)}
+              </div>
+            </details>
+          </PipeSection>
+        </div>
+      </div>
+
+      <div className="stack" style={{ gap: 16 }}>
+        <div className="card">
+          <div className="card-head">
+            <div className="card-title row" style={{ gap: 8 }}><Ic.Sigma s={14} /> Resumen del pipeline</div>
+          </div>
+          <div className="card-body">
+            <div className="stack" style={{ gap: 8 }}>
+              {[
+                ['1. Minúsculas', opts.lowercase],
+                ['2. Sin números', opts.stripNumbers],
+                ['3. Espacios normalizados', opts.normalizeSpaces],
+                [`4. Símbolos (${opts.activeSymbols.length})`, opts.removeSymbols],
+                [`5. Tokenizar · ${opts.tokenizeMode}`, opts.tokenize],
+                [`6. Stopwords (${DEFAULT_STOPWORDS.length + opts.customStopwords.length})`, opts.removeStopwords],
+              ].map(([label, on], i) => (
+                <div key={i} className="row between" style={{ padding: '8px 10px', borderRadius: 8, background: on ? 'rgba(124,58,237,0.06)' : 'rgba(2,6,23,0.4)', border: '1px solid', borderColor: on ? 'rgba(167,139,250,0.18)' : 'var(--line)' }}>
+                  <span style={{ fontSize: 12.5, color: on ? 'var(--text)' : 'var(--text-mute)' }}>{label}</span>
+                  {on ? <span className="badge violet"><Ic.Check s={10} /> ON</span> : <span className="badge slate">OFF</span>}
+                </div>
+              ))}
+            </div>
+            <div className="divider" />
+            <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '12px 16px' }} onClick={onProcess}><Ic.Play s={13} /> Procesar</button>
+            <button className="btn btn-ghost" style={{ width: '100%', justifyContent: 'center', marginTop: 8 }} onClick={onReset}><Ic.Reset s={13} /> Reiniciar pipeline</button>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="card-head">
+            <div>
+              <div className="card-title">Vista previa del flujo</div>
+              <div className="card-sub">Pseudocódigo del pipeline configurado.</div>
+            </div>
+          </div>
+          <div className="card-body" style={{ padding: 0 }}>
+            <pre className="mono" style={{ margin: 0, padding: '14px 18px', fontSize: 12, lineHeight: 1.8, color: 'var(--mono-green)', background: 'rgba(2,6,23,0.5)' }}>
+{`text = input`}
+{opts.lowercase && '\ntext = text.lower()'}
+{opts.stripNumbers && '\ntext = re.sub(r"\\d+", " ", text)'}
+{opts.removeSymbols && `\ntext = strip_symbols(text, n=${opts.activeSymbols.length})`}
+{opts.normalizeSpaces && '\ntext = re.sub(r"\\s+", " ", text).strip()'}
+{opts.tokenize && `\ntokens = tokenize(text, mode="${opts.tokenizeMode}")`}
+{opts.removeStopwords && `\ntokens = [t for t in tokens if t not in stop]`}
+{'\nreturn tokens'}
+            </pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ===== Step 3 =====
+function Metric({ label, value, delta, icon, accent }) {
+  return (
+    <div className="metric">
+      <div className="metric-label">{icon}{label}</div>
+      <div className="metric-value" style={accent ? { color: accent } : null}>{value}</div>
+      {delta && <div className="metric-delta">{delta}</div>}
+    </div>
+  );
+}
+
+function Step3Visualizacion({ opts }) {
+  const [tab, setTab] = useState('summary');
+  const [topN, setTopN] = useState(25);
+  const [formulasOpen, setFormulasOpen] = useState(true);
+
+  const freqShown = useMemo(() => SAMPLE_FREQ.slice(0, topN), [topN]);
+  const maxCount = SAMPLE_FREQ[0]?.count || 1;
+
+  const tabs = [
+    { id: 'summary',  label: 'Resumen',     count: 6,                          icon: <Ic.Sigma s={13} /> },
+    { id: 'compare',  label: 'Comparación', count: 3,                          icon: <Ic.Compare s={13} /> },
+    { id: 'tokens',   label: 'Tokens',      count: SAMPLE_TOKENS_AFTER.length, icon: <Ic.Token s={13} /> },
+    { id: 'freq',     label: 'Frecuencias', count: SAMPLE_FREQ.length,         icon: <Ic.Bars s={13} /> },
+  ];
+
+  return (
+    <div className="stack" style={{ gap: 16 }}>
+      <div className="card">
+        <div className="card-head" style={{ paddingBottom: 0, borderBottom: 'none', alignItems: 'flex-end' }}>
+          <div>
+            <div className="card-title row" style={{ gap: 8 }}>
+              <Ic.Bars s={14} /> Visualización
+              <span className="badge green"><Ic.Check s={10} /> Pipeline ejecutado</span>
+            </div>
+            <div className="card-sub">Resultados sobre <span className="mono">{SAMPLE_METRICS.wordsOriginal}</span> palabras de entrada · ejecutado en <span className="mono">42 ms</span></div>
+          </div>
+        </div>
+        <div className="tabs">
+          {tabs.map(t => (
+            <button key={t.id} className={"tab " + (tab === t.id ? 'active' : '')} onClick={() => setTab(t.id)}>
+              {t.icon}{t.label}<span className="count">{t.count}</span>
+            </button>
+          ))}
+        </div>
+        <div className="card-body">
+
+          {tab === 'summary' && (
+            <div className="grid-metrics">
+              <Metric label="Palabras originales" value={SAMPLE_METRICS.wordsOriginal} delta="texto de entrada" icon={<Ic.Type s={11} />} />
+              <Metric label="Tokens finales" value={SAMPLE_METRICS.tokensFinal} delta={`de ${SAMPLE_TOKENS_BEFORE.length} pre-filtro`} icon={<Ic.Token s={11} />} accent="#c4b5fd" />
+              <Metric label="Tokens únicos" value={SAMPLE_METRICS.tokensUnique} delta={`vocab ${(SAMPLE_METRICS.tokensUnique / SAMPLE_METRICS.tokensFinal * 100).toFixed(1)}%`} icon={<Ic.Hash s={11} />} />
+              <Metric label="Stopwords eliminadas" value={SAMPLE_METRICS.stopwordsRemoved} delta="palabras vacías" icon={<Ic.Filter s={11} />} accent="#fcd34d" />
+              <Metric label="Reducción" value={SAMPLE_METRICS.reductionPct.toFixed(1) + '%'} delta="vs original" icon={<Ic.Sigma s={11} />} accent="#86efac" />
+              <Metric label="Token más frecuente" value={'"' + SAMPLE_METRICS.topToken.token + '"'} delta={SAMPLE_METRICS.topToken.count + ' apariciones'} icon={<Ic.Spark s={11} />} />
+            </div>
+          )}
+
+          {tab === 'compare' && (
+            <div className="grid-3">
+              <div className="code-col">
+                <div className="h"><span>· Texto original</span><span className="mono">{SAMPLE_TEXT.length} chars</span></div>
+                <div style={{ fontSize: 12.5, lineHeight: 1.7, color: 'var(--text)' }}>{SAMPLE_TEXT}</div>
+              </div>
+              <div className="code-col">
+                <div className="h"><span>· Texto limpio</span><span className="mono">{SAMPLE_CLEAN.length} chars</span></div>
+                <div style={{ fontSize: 12.5, lineHeight: 1.7, color: 'var(--text-dim)' }}>{SAMPLE_CLEAN}</div>
+              </div>
+              <div className="code-col">
+                <div className="h"><span>· Texto procesado</span><span className="mono">{SAMPLE_TOKENS_AFTER.length} tokens</span></div>
+                <div style={{ fontSize: 12.5, lineHeight: 1.7 }}>
+                  {SAMPLE_TOKENS_AFTER.map((t, i) => <span key={i} className="token kept">{t}</span>)}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {tab === 'tokens' && (
+            <div className="grid-2">
+              <div className="code-col">
+                <div className="h">
+                  <span>· Antes de stopwords <span className="badge slate" style={{ marginLeft: 6 }}>{SAMPLE_TOKENS_BEFORE.length}</span></span>
+                  <span className="mono mute">tokenized</span>
+                </div>
+                <div>
+                  {SAMPLE_TOKENS_BEFORE.map((t, i) => {
+                    const removed = DEFAULT_STOPWORDS.includes(t);
+                    return <span key={i} className={"token " + (removed ? 'removed' : '')}>{t}</span>;
+                  })}
+                </div>
+              </div>
+              <div className="code-col">
+                <div className="h">
+                  <span>· Después de stopwords <span className="badge violet" style={{ marginLeft: 6 }}>{SAMPLE_TOKENS_AFTER.length}</span></span>
+                  <span className="mono" style={{ color: '#86efac' }}>−{SAMPLE_METRICS.stopwordsRemoved}</span>
+                </div>
+                <div>
+                  {SAMPLE_TOKENS_AFTER.map((t, i) => <span key={i} className="token kept">{t}</span>)}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {tab === 'freq' && (
+            <div>
+              <div className="row between" style={{ marginBottom: 14 }}>
+                <div className="row" style={{ gap: 8 }}>
+                  <span className="mute" style={{ fontSize: 12 }}>Top</span>
+                  <div className="row" style={{ gap: 4, padding: 3, background: 'var(--bg-1)', border: '1px solid var(--line)', borderRadius: 8 }}>
+                    {[10, 25, 50, 100].map(n => (
+                      <button
+                        key={n}
+                        onClick={() => setTopN(n)}
+                        className={"btn btn-sm " + (topN === n ? 'btn-primary' : 'btn-ghost')}
+                        style={{ padding: '5px 12px', fontSize: 12, border: topN === n ? '1px solid rgba(167,139,250,0.4)' : '1px solid transparent', background: topN === n ? 'var(--violet)' : 'transparent' }}
+                      >
+                        {n}
+                      </button>
+                    ))}
+                  </div>
+                  <span className="mute" style={{ fontSize: 12 }}>de <span className="mono" style={{ color: 'var(--text)' }}>{SAMPLE_FREQ.length}</span> tokens únicos</span>
+                </div>
+                <button className="btn btn-sm btn-ghost"><Ic.Download s={12} /> Exportar CSV</button>
+              </div>
+              <div style={{ border: '1px solid var(--line)', borderRadius: 9, overflow: 'hidden' }}>
+                <table className="tbl">
+                  <thead>
+                    <tr>
+                      <th style={{ width: 50 }}>#</th>
+                      <th>Token</th>
+                      <th style={{ width: 90, textAlign: 'right' }}>Conteo</th>
+                      <th style={{ width: 110, textAlign: 'right' }}>Frecuencia</th>
+                      <th style={{ width: '40%' }}>Distribución</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {freqShown.map(row => (
+                      <tr key={row.rank}>
+                        <td style={{ color: 'var(--text-mute)' }}>{row.rank.toString().padStart(2, '0')}</td>
+                        <td style={{ color: 'var(--text)', fontWeight: 500 }}>{row.token}</td>
+                        <td style={{ textAlign: 'right', color: '#c4b5fd' }}>{row.count}</td>
+                        <td style={{ textAlign: 'right', color: 'var(--text-dim)' }}>{(row.freq * 100).toFixed(2)}%</td>
+                        <td><div className="freq-bar"><div className="freq-fill" style={{ width: (row.count / maxCount * 100) + '%' }} /></div></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="formulas">
+        <div className="formulas-head" onClick={() => setFormulasOpen(o => !o)}>
+          <div className="row" style={{ gap: 8, flex: 1 }}>
+            <Ic.Sigma s={14} />
+            <span style={{ fontWeight: 600, fontSize: 13 }}>Fórmulas ejecutadas</span>
+            <span className="mute mono" style={{ fontSize: 11 }}>· {[opts.lowercase, opts.stripNumbers, opts.normalizeSpaces, opts.removeSymbols, opts.tokenize, opts.removeStopwords].filter(Boolean).length} etapas</span>
+          </div>
+          <div className="section-chev" style={{ transform: formulasOpen ? 'rotate(180deg)' : 'none' }}><Ic.Chev s={14} /></div>
+        </div>
+        {formulasOpen && (
+          <div className="formulas-body">
+            {[
+              opts.lowercase     && { lbl: 'lowercase',       f: 'T₁(s) = ⋃ᵢ toLower(sᵢ)   →   |s| = ' + SAMPLE_TEXT.length },
+              opts.stripNumbers  && { lbl: 'strip_numbers',   f: 'T₂(s) = s.replace(/[0-9]+/g, " ")   →   matches = 4' },
+              opts.removeSymbols && { lbl: 'strip_symbols',   f: 'T₃(s) = { c ∈ s : c ∉ Σ }   donde   |Σ| = ' + opts.activeSymbols.length },
+              opts.normalizeSpaces && { lbl: 'normalize_space', f: 'T₄(s) = s.replace(/\\s+/g, " ").trim()' },
+              opts.tokenize      && { lbl: 'tokenize',        f: 'T₅(s) = split(s, "' + opts.tokenizeMode + '")   →   |T| = ' + SAMPLE_TOKENS_BEFORE.length },
+              opts.removeStopwords && { lbl: 'remove_stop',   f: 'T₆(T) = { t ∈ T : t ∉ W }   |W| = ' + (DEFAULT_STOPWORDS.length + opts.customStopwords.length) + '   |T\'| = ' + SAMPLE_TOKENS_AFTER.length },
+              { lbl: 'freq',      f: 'P(tᵢ) = count(tᵢ) / |T\'|   ∀ tᵢ ∈ T\'   →   max = ' + SAMPLE_METRICS.topToken.token + ' (' + SAMPLE_METRICS.topToken.count + ')' },
+              { lbl: 'reduction', f: 'Δ = (|T| − |T\'|) / |T| = ' + SAMPLE_METRICS.reductionPct.toFixed(2) + '%' },
+            ].filter(Boolean).map((row, i) => (
+              <div key={i} className="fline">
+                <span className="num">{(i + 1).toString().padStart(2, '0')}</span>
+                <span className="step-lbl">[{row.lbl}]</span>
+                <span style={{ flex: 1 }}>{row.f}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ===== Step 4 =====
+const CSV_COLUMNS = {
+  'Identificadores': [
+    { id: 'idx',            label: 'idx',            desc: 'Índice del token' },
+    { id: 'doc_id',         label: 'doc_id',         desc: 'ID del documento' },
+  ],
+  'Contenido': [
+    { id: 'token',          label: 'token',          desc: 'Token procesado' },
+    { id: 'token_original', label: 'token_original', desc: 'Forma original' },
+    { id: 'normalized',     label: 'normalized',     desc: 'Forma normalizada' },
+    { id: 'length',         label: 'length',         desc: 'Largo en caracteres' },
+  ],
+  'Estadísticas': [
+    { id: 'count',          label: 'count',          desc: 'Apariciones globales' },
+    { id: 'freq',           label: 'freq',           desc: 'Frecuencia relativa' },
+    { id: 'rank',           label: 'rank',           desc: 'Ranking por frecuencia' },
+    { id: 'is_stopword',    label: 'is_stopword',    desc: 'Booleano stopword' },
+  ],
+};
+
+function Step4Exportacion() {
+  const [txtName, setTxtName] = useState('pipenlp_reporte_2026-05-27');
+  const [csvName, setCsvName] = useState('pipenlp_dataset_2026-05-27');
+  const [savedTxt, setSavedTxt] = useState(false);
+  const [selectedCols, setSelectedCols] = useState(new Set(['idx', 'token', 'token_original', 'count', 'freq', 'rank']));
+
+  const toggleCol = (id) => {
+    setSelectedCols(s => {
+      const ns = new Set(s);
+      if (ns.has(id)) ns.delete(id); else ns.add(id);
+      return ns;
+    });
+  };
+
+  const selectedList = Object.values(CSV_COLUMNS).flat().filter(c => selectedCols.has(c.id));
+
+  const previewRows = SAMPLE_FREQ.slice(0, 5).map((r, i) => ({
+    idx: i, doc_id: 'doc_001', token: r.token, token_original: r.token,
+    normalized: r.token.toLowerCase(), length: r.token.length,
+    count: r.count, freq: r.freq.toFixed(4), rank: r.rank, is_stopword: 'false',
+  }));
+
+  return (
+    <div className="grid-2" style={{ alignItems: 'start' }}>
+      <div className="card">
+        <div className="card-head">
+          <div>
+            <div className="card-title row" style={{ gap: 8 }}><Ic.Doc s={14} /> Reporte de procesamiento</div>
+            <div className="card-sub">Resumen legible en formato <span className="mono">.txt</span> con métricas y configuración usada.</div>
+          </div>
+          <span className="badge slate">.txt</span>
+        </div>
+        <div className="card-body">
+          <div className="stack" style={{ gap: 6 }}>
+            <label className="mute" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Nombre de archivo</label>
+            <div className="row" style={{ gap: 6 }}>
+              <input className="input" value={txtName} onChange={(e) => setTxtName(e.target.value)} style={{ flex: 1 }} />
+              <span className="badge slate mono">.txt</span>
+            </div>
+          </div>
+
+          <div className="code-col" style={{ marginTop: 14, maxHeight: 220, fontSize: 11.5, background: 'rgba(2,6,23,0.7)' }}>
+            <div className="h" style={{ marginBottom: 8 }}>
+              <span>· Preview</span>
+              <span className="mono mute">{txtName}.txt</span>
+            </div>
+{`# PipeNLP · Reporte de procesamiento
+# Generado: 2026-05-27 14:32:18 UTC
+# Pipeline ID: pl_8f7a2c
+
+[ENTRADA]
+  caracteres ........... ${SAMPLE_TEXT.length}
+  palabras ............. ${SAMPLE_METRICS.wordsOriginal}
+  líneas ............... 8
+
+[PIPELINE]
+  ✓ minúsculas
+  ✓ eliminar números
+  ✓ normalizar espacios
+  ✓ limpiar símbolos (42)
+  ✓ tokenizar (words)
+  ✓ stopwords (es, 47)
+
+[SALIDA]
+  tokens totales ....... ${SAMPLE_TOKENS_AFTER.length}
+  tokens únicos ........ ${SAMPLE_METRICS.tokensUnique}
+  reducción ............ ${SAMPLE_METRICS.reductionPct.toFixed(1)}%
+  top token ............ "${SAMPLE_METRICS.topToken.token}" (${SAMPLE_METRICS.topToken.count})
+
+[TOP-10]
+${SAMPLE_FREQ.slice(0, 10).map((r, i) => `  ${(i+1).toString().padStart(2)}. ${r.token.padEnd(20)} ${r.count}`).join('\n')}`}
+          </div>
+
+          <div className="row" style={{ gap: 8, marginTop: 14 }}>
+            <button className="btn" style={{ flex: 1, justifyContent: 'center' }} onClick={() => { setSavedTxt(true); setTimeout(() => setSavedTxt(false), 2000); }}><Ic.Save s={13} /> Guardar</button>
+            <button className="btn btn-primary" style={{ flex: 1, justifyContent: 'center' }}><Ic.Download s={13} /> Descargar .txt</button>
+          </div>
+          {savedTxt && <div className="badge green" style={{ marginTop: 10 }}><Ic.Check s={11} /> Guardado en /reports/</div>}
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="card-head">
+          <div>
+            <div className="card-title row" style={{ gap: 8 }}><Ic.Table s={14} /> Dataset estructurado</div>
+            <div className="card-sub">Selecciona columnas para exportar como dataset tabular.</div>
+          </div>
+          <span className="badge slate">.csv</span>
+        </div>
+        <div className="card-body">
+          <div className="stack" style={{ gap: 10 }}>
+            {Object.entries(CSV_COLUMNS).map(([cat, cols]) => (
+              <div key={cat}>
+                <div className="row between" style={{ marginBottom: 6 }}>
+                  <div className="mute" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{cat}</div>
+                  <span className="mono mute" style={{ fontSize: 11 }}>{cols.filter(c => selectedCols.has(c.id)).length}/{cols.length}</span>
+                </div>
+                <div className="stack" style={{ gap: 5 }}>
+                  {cols.map(c => {
+                    const on = selectedCols.has(c.id);
+                    return (
+                      <label key={c.id} className="row" style={{ gap: 10, padding: '7px 10px', borderRadius: 7, border: '1px solid', borderColor: on ? 'rgba(167,139,250,0.25)' : 'var(--line)', background: on ? 'rgba(124,58,237,0.05)' : 'transparent', cursor: 'pointer' }} onClick={() => toggleCol(c.id)}>
+                        <span className={"check " + (on ? 'on' : '')} />
+                        <div style={{ flex: 1, lineHeight: 1.3 }}>
+                          <div className="mono" style={{ fontSize: 12, color: on ? '#c4b5fd' : 'var(--text)' }}>{c.label}</div>
+                          <div className="mute" style={{ fontSize: 11 }}>{c.desc}</div>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="divider" />
+
+          <div className="mute" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Preview ({selectedList.length} columnas)</div>
+          <div style={{ border: '1px solid var(--line)', borderRadius: 9, overflow: 'auto', maxHeight: 180 }}>
+            <table className="tbl">
+              <thead>
+                <tr>{selectedList.map(c => <th key={c.id} className="mono" style={{ whiteSpace: 'nowrap', fontSize: 10.5 }}>{c.label}</th>)}</tr>
+              </thead>
+              <tbody>
+                {previewRows.map((row, i) => (
+                  <tr key={i}>{selectedList.map(c => <td key={c.id} style={{ whiteSpace: 'nowrap' }}>{row[c.id]}</td>)}</tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="stack" style={{ gap: 6, marginTop: 14 }}>
+            <label className="mute" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Nombre de archivo</label>
+            <div className="row" style={{ gap: 6 }}>
+              <input className="input" value={csvName} onChange={(e) => setCsvName(e.target.value)} style={{ flex: 1 }} />
+              <span className="badge slate mono">.csv</span>
+            </div>
+          </div>
+
+          <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', marginTop: 12 }} disabled={selectedList.length === 0}>
+            <Ic.Download s={13} /> Descargar dataset ({SAMPLE_FREQ.length} filas × {selectedList.length} cols)
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ===== App =====
+function PipeNLPApp() {
+  const [step, setStep] = useState(1);
+  const [processed, setProcessed] = useState(false);
+  const [text, setText] = useState(SAMPLE_TEXT);
+  const [opts, setOpts] = useState({
+    lowercase: true,
+    stripNumbers: true,
+    normalizeSpaces: true,
+    removeSymbols: true,
+    activeSymbols: [...DEFAULT_SYMBOLS],
+    extraSymbols: [],
+    tokenize: true,
+    tokenizeMode: 'words',
+    removeStopwords: true,
+    customStopwords: ['nlp', 'pipeline'],
+  });
+
+  const onProcess = () => { setProcessed(true); setStep(3); };
+
+  const onResetPipeline = () => {
+    setOpts({
+      lowercase: false, stripNumbers: false, normalizeSpaces: false, removeSymbols: false,
+      activeSymbols: [...DEFAULT_SYMBOLS], extraSymbols: [],
+      tokenize: false, tokenizeMode: 'words', removeStopwords: false, customStopwords: [],
+    });
+    setProcessed(false);
+  };
+
+  const steps = [
+    { n: 1, t: 'Ingreso',       s: 'Carga el corpus' },
+    { n: 2, t: 'Opciones',      s: 'Configura el pipeline' },
+    { n: 3, t: 'Visualización', s: 'Inspecciona resultados' },
+    { n: 4, t: 'Exportación',   s: 'Descarga artefactos' },
+  ];
+
+  return (
+    <div className="app">
+      <div className="topbar">
+        <div className="brand">
+          <div className="brand-mark" />
+          <div>
+            <div className="brand-name">PipeNLP</div>
+            <div className="brand-sub">Pipeline de preprocesamiento NLP</div>
+          </div>
+        </div>
+        <div className="topbar-right">
+          <span className="pill"><span className="dot" /> sesión activa</span>
+          <span className="pill">v0.4.2</span>
+          <span className="pill">es · UTF-8</span>
+        </div>
+      </div>
+
+      <div className="stepper">
+        {steps.map((s, i) => {
+          const active = step === s.n;
+          const done = (processed && s.n < 3) || (step > s.n);
+          return (
+            <React.Fragment key={s.n}>
+              <div className={"step" + (active ? ' active' : '') + (done ? ' done' : '')} onClick={() => setStep(s.n)}>
+                <div className="step-num">{done ? <Ic.Check s={13} /> : s.n}</div>
+                <div className="step-label">
+                  <div className="t">{s.t}</div>
+                  <div className="s">{s.s}</div>
+                </div>
+              </div>
+              {i < steps.length - 1 && <div className="step-sep">→</div>}
+            </React.Fragment>
+          );
+        })}
+      </div>
+
+      {step === 1 && <Step1Ingreso text={text} setText={setText} />}
+      {step === 2 && <Step2Opciones opts={opts} setOpts={setOpts} onProcess={onProcess} onReset={onResetPipeline} />}
+      {step === 3 && <Step3Visualizacion opts={opts} />}
+      {step === 4 && <Step4Exportacion />}
+
+      <div className="footer-bar">
+        <div className="left">
+          <span className="mute mono" style={{ fontSize: 11 }}>paso {step} de 4</span>
+          {processed && <span className="badge green"><Ic.Check s={11} /> pipeline ejecutado</span>}
+        </div>
+        <div className="right">
+          <button className="btn btn-ghost" onClick={() => setStep(Math.max(1, step - 1))} disabled={step === 1} style={{ opacity: step === 1 ? 0.4 : 1 }}>← Anterior</button>
+          <button
+            className="btn btn-primary"
+            onClick={() => { if (step === 2) onProcess(); else setStep(Math.min(4, step + 1)); }}
+            disabled={step === 4}
+            style={{ opacity: step === 4 ? 0.4 : 1 }}
+          >
+            {step === 2 ? <><Ic.Play s={12} /> Procesar</> : <>Siguiente →</>}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<PipeNLPApp />);
+</script>
+</body>
+</html>

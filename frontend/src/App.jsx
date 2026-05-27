@@ -1,48 +1,70 @@
 import { useState, useEffect } from 'react'
 import DataInput from './components/DataInput'
 import NLPOptions from './components/NLPOptions'
-import FormulaDisplay from './components/FormulaDisplay'
 import Visualization from './components/Visualization'
 import ExportPanel from './components/ExportPanel'
 
-const DEFAULT_OPTIONS = {
-  cleanSymbols: true,
-  selectedSymbols: null,
-  extraSymbols: [],
-  doTokenize: true,
-  tokenMode: 'words',
-  removeStopwords: true,
-  extraStopwords: [],
-  toLowercase: false,
-  removeNumbers: false,
+// ── Icons ─────────────────────────────────────────────────────
+const Ic = {
+  Check: (p) => (
+    <svg width={p.s || 14} height={p.s || 14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="20 6 9 17 4 12" />
+    </svg>
+  ),
+  Play: (p) => (
+    <svg width={p.s || 14} height={p.s || 14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <polygon points="5 3 19 12 5 21 5 3" fill="currentColor" />
+    </svg>
+  ),
+  Reset: (p) => (
+    <svg width={p.s || 14} height={p.s || 14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+    </svg>
+  ),
+}
+
+// ── Default symbols from design ────────────────────────────────
+const DESIGN_SYMBOLS = [
+  '.', ',', ';', ':', '!', '?', '¿', '¡', '"', "'", '“', '”',
+  '(', ')', '[', ']', '{', '}', '—', '–', '-', '_',
+  '/', '\\', '|', '@', '#', '$', '%', '&', '*', '+', '=',
+  '<', '>', '~', '`', '^', '°', '€', '£', '·'
+]
+
+const DEFAULT_OPTS = {
+  lowercase: true,
+  stripNumbers: true,
   normalizeSpaces: true,
+  removeSymbols: true,
+  activeSymbols: [...DESIGN_SYMBOLS],
+  extraSymbols: [],
+  tokenize: true,
+  tokenizeMode: 'words',
+  removeStopwords: true,
+  customStopwords: [],
 }
 
 export default function App() {
-  const [inputMode, setInputMode] = useState('text')
-  const [text, setText] = useState('')
-  const [options, setOptions] = useState(DEFAULT_OPTIONS)
-  const [defaultSymbols, setDefaultSymbols] = useState([])
+  const [step, setStep]           = useState(1)
+  const [processed, setProcessed] = useState(false)
+  const [text, setText]           = useState('')
+  const [opts, setOpts]           = useState(DEFAULT_OPTS)
+  const [defaultSymbols, setDefaultSymbols]     = useState(DESIGN_SYMBOLS)
   const [defaultStopwords, setDefaultStopwords] = useState([])
-  const [result, setResult] = useState(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(null)
+  const [result, setResult]       = useState(null)
+  const [loading, setLoading]     = useState(false)
+  const [error, setError]         = useState(null)
 
-  function handleReset() {
-    setInputMode('text')
-    setText('')
-    setOptions({ ...DEFAULT_OPTIONS, selectedSymbols: defaultSymbols })
-    setResult(null)
-    setError(null)
-  }
-
+  // Load defaults from API
   useEffect(() => {
     fetch('/api/config')
       .then(r => r.json())
       .then(data => {
-        setDefaultSymbols(data.symbols ?? [])
-        setDefaultStopwords(data.stopwords ?? [])
-        setOptions(prev => ({ ...prev, selectedSymbols: data.symbols ?? [] }))
+        const syms = data.symbols ?? DESIGN_SYMBOLS
+        const stops = data.stopwords ?? []
+        setDefaultSymbols(syms)
+        setDefaultStopwords(stops)
+        setOpts(prev => ({ ...prev, activeSymbols: syms }))
       })
       .catch(() => {})
   }, [])
@@ -52,7 +74,9 @@ export default function App() {
       setError('Debe ingresar texto o cargar un archivo antes de procesar.')
       return
     }
-    if (!options.cleanSymbols && !options.doTokenize && !options.removeStopwords && !options.toLowercase && !options.removeNumbers && !options.normalizeSpaces) {
+    const anyActive = opts.lowercase || opts.stripNumbers || opts.normalizeSpaces ||
+      opts.removeSymbols || opts.tokenize || opts.removeStopwords
+    if (!anyActive) {
       setError('Debe seleccionar al menos una opción de preprocesamiento.')
       return
     }
@@ -60,31 +84,36 @@ export default function App() {
     setError(null)
     setResult(null)
     try {
-      const syms = options.selectedSymbols ?? defaultSymbols
-      const allSyms = [...new Set([...syms, ...options.extraSymbols])]
+      const tokenModeMap = { 'words+symbols': 'all' }
+      const apiMode = tokenModeMap[opts.tokenizeMode] ?? opts.tokenizeMode
+
       const res = await fetch('/api/process/text', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           text,
-          clean_symbols: options.cleanSymbols,
-          extra_symbols: options.extraSymbols,
-          selected_symbols: allSyms,
-          do_tokenize: options.doTokenize,
-          token_mode: options.tokenMode,
-          remove_stopwords: options.removeStopwords,
-          extra_stopwords: options.extraStopwords,
-          to_lowercase: options.toLowercase,
-          remove_numbers: options.removeNumbers,
-          normalize_spaces: options.normalizeSpaces,
+          clean_symbols:    opts.removeSymbols,
+          selected_symbols: opts.activeSymbols,
+          extra_symbols:    opts.extraSymbols,
+          do_tokenize:      opts.tokenize,
+          token_mode:       apiMode,
+          remove_stopwords: opts.removeStopwords,
+          extra_stopwords:  opts.customStopwords,
+          to_lowercase:     opts.lowercase,
+          remove_numbers:   opts.stripNumbers,
+          normalize_spaces: opts.normalizeSpaces,
         }),
       })
       if (!res.ok) throw new Error(await res.text())
       const data = await res.json()
-      setResult(data)
       if ((data.tokens?.length ?? 0) === 0) {
         setError('No se encontraron tokens después del procesamiento.')
+        setLoading(false)
+        return
       }
+      setResult(data)
+      setProcessed(true)
+      setStep(3)
     } catch (e) {
       setError(e.message)
     } finally {
@@ -92,101 +121,127 @@ export default function App() {
     }
   }
 
-  return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
-      <header className="bg-slate-900 border-b border-slate-800 px-6 py-4">
-        <h1 className="text-xl font-bold text-violet-400">NLP Pipeline</h1>
-        <p className="text-sm text-slate-400">Herramienta de preprocesamiento de texto para minería de datos</p>
-      </header>
+  function handleReset() {
+    setText('')
+    setOpts({ ...DEFAULT_OPTS, activeSymbols: defaultSymbols })
+    setResult(null)
+    setError(null)
+    setProcessed(false)
+    setStep(1)
+  }
 
-      <main className="max-w-6xl mx-auto px-4 py-6 space-y-4">
-        <FlowSteps result={result} />
-
-        {/* 1. Ingreso */}
-        <DataInput
-          text={text}
-          onTextChange={setText}
-          inputMode={inputMode}
-          setInputMode={setInputMode}
-        />
-
-        {/* 2. Opciones NLP + Fórmulas */}
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-          <div className="lg:col-span-3">
-            <NLPOptions
-              defaultSymbols={defaultSymbols}
-              defaultStopwords={defaultStopwords}
-              options={options}
-              onChange={setOptions}
-            />
-          </div>
-          <div className="lg:col-span-2">
-            <FormulaDisplay steps={result?.steps ?? []} />
-          </div>
-        </div>
-
-        {/* Botón procesar */}
-        <div className="flex flex-wrap items-center gap-4">
-          <button
-            onClick={handleProcess}
-            disabled={loading || !text.trim()}
-            className="px-8 py-2.5 bg-violet-600 hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition text-sm"
-          >
-            {loading ? 'Procesando...' : 'Procesar'}
-          </button>
-          <button
-            onClick={handleReset}
-            className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-medium rounded-xl transition text-sm"
-          >
-            Reiniciar pipeline
-          </button>
-          {error && <p className="text-red-400 text-sm">{error}</p>}
-        </div>
-
-        {result && <StatusBadges result={result} />}
-
-        {/* 3. Visualización */}
-        <Visualization result={result} />
-
-        {/* 4. Exportar */}
-        <ExportPanel result={result} />
-      </main>
-    </div>
-  )
-}
-
-function FlowSteps({ result }) {
-  const steps = ['1. Ingreso', '2. Opciones', '3. Visualización', '4. Exportación']
-  return (
-    <section className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-3">
-      <div className="flex flex-wrap items-center gap-2 text-sm">
-        {steps.map((step, index) => (
-          <div key={step} className="flex items-center gap-2">
-            <span className={`px-3 py-1 rounded-full border ${result || index < 2 ? 'bg-violet-900/40 border-violet-700 text-violet-200' : 'bg-slate-800 border-slate-700 text-slate-400'}`}>
-              {step}
-            </span>
-            {index < steps.length - 1 && <span className="text-slate-600">→</span>}
-          </div>
-        ))}
-      </div>
-    </section>
-  )
-}
-
-function StatusBadges({ result }) {
-  const badges = [
-    'Texto procesado correctamente',
-    result.configuracion?.remove_stopwords ? 'Stopwords aplicadas' : 'Stopwords desactivadas',
-    result.configuracion?.clean_symbols ? 'Símbolos eliminados' : 'Limpieza de símbolos desactivada',
-    'Dataset listo para exportar',
+  const steps = [
+    { n: 1, t: 'Ingreso',       s: 'Carga el corpus' },
+    { n: 2, t: 'Opciones',      s: 'Configura el pipeline' },
+    { n: 3, t: 'Visualización', s: 'Inspecciona resultados' },
+    { n: 4, t: 'Exportación',   s: 'Descarga artefactos' },
   ]
+
+  function goNext() {
+    if (step === 2) { handleProcess(); return }
+    setStep(s => Math.min(4, s + 1))
+  }
+  function goPrev() { setStep(s => Math.max(1, s - 1)) }
+
   return (
-    <div className="flex flex-wrap gap-2">
-      {badges.map(badge => (
-        <span key={badge} className="px-3 py-1 bg-emerald-900/40 border border-emerald-700 text-emerald-200 rounded-full text-xs">
-          ✓ {badge}
-        </span>
-      ))}
+    <div className="app">
+      {/* ── Topbar ── */}
+      <div className="topbar">
+        <div className="brand">
+          <div className="brand-mark" />
+          <div>
+            <div className="brand-name">PipeNLP</div>
+            <div className="brand-sub">Pipeline de preprocesamiento NLP</div>
+          </div>
+        </div>
+        <div className="topbar-right">
+          <span className="pill"><span className="dot" /> sesión activa</span>
+          <span className="pill">v1.0</span>
+          <span className="pill">es · UTF-8</span>
+        </div>
+      </div>
+
+      {/* ── Stepper ── */}
+      <div className="stepper">
+        {steps.map((s, i) => {
+          const active = step === s.n
+          const done = (processed && s.n < step) || (processed && s.n <= 2)
+          return (
+            <div key={s.n} style={{ display: 'contents' }}>
+              <div
+                className={'step' + (active ? ' active' : '') + (done ? ' done' : '')}
+                onClick={() => setStep(s.n)}
+              >
+                <div className="step-num">
+                  {done ? <Ic.Check s={13} /> : s.n}
+                </div>
+                <div className="step-label">
+                  <div className="t">{s.t}</div>
+                  <div className="s">{s.s}</div>
+                </div>
+              </div>
+              {i < steps.length - 1 && <div className="step-sep">→</div>}
+            </div>
+          )
+        })}
+      </div>
+
+      {/* ── Step content ── */}
+      {step === 1 && (
+        <DataInput text={text} setText={setText} />
+      )}
+      {step === 2 && (
+        <NLPOptions
+          opts={opts}
+          setOpts={setOpts}
+          defaultSymbols={defaultSymbols}
+          defaultStopwords={defaultStopwords}
+          onProcess={handleProcess}
+          onReset={handleReset}
+          loading={loading}
+        />
+      )}
+      {step === 3 && (
+        <Visualization result={result} opts={opts} />
+      )}
+      {step === 4 && (
+        <ExportPanel result={result} text={text} opts={opts} />
+      )}
+
+      {/* ── Footer bar ── */}
+      <div className="footer-bar">
+        <div className="left">
+          <span className="mute mono" style={{ fontSize: 11 }}>paso {step} de 4</span>
+          {processed && (
+            <span className="badge green"><Ic.Check s={11} /> pipeline ejecutado</span>
+          )}
+          {error && (
+            <span style={{ color: 'var(--red)', fontSize: 12 }}>{error}</span>
+          )}
+        </div>
+        <div className="right">
+          <button
+            className="btn btn-ghost"
+            onClick={goPrev}
+            disabled={step === 1}
+            style={{ opacity: step === 1 ? 0.4 : 1 }}
+          >
+            ← Anterior
+          </button>
+          <button
+            className="btn btn-primary"
+            onClick={goNext}
+            disabled={step === 4 || (step !== 2 && step === 3 && !processed)}
+            style={{ opacity: step === 4 ? 0.4 : 1 }}
+          >
+            {step === 2
+              ? loading
+                ? 'Procesando…'
+                : <><Ic.Play s={12} /> Procesar</>
+              : 'Siguiente →'}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
